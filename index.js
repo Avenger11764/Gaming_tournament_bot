@@ -76,13 +76,12 @@ function formatPlayerHandle(p) {
   return sanitizeMarkdown(p.first_name || p.in_game_name || 'Player');
 }
 
-// Global Error Handler so bot never crashes on syntax or Markdown errors
 bot.catch((err, ctx) => {
   console.error(`Unhandled error for ${ctx.updateType}:`, err);
   try {
     const errorMsg = err.message || 'Unknown error';
-    if (errorMsg.includes('can\'t parse entities') || errorMsg.includes('Bad Request')) {
-      return ctx.reply(`❌ Request completed with notice: Please avoid special characters in team or player names.`);
+    if (errorMsg.includes("can't parse entities") || errorMsg.includes('Bad Request')) {
+      return ctx.reply(`❌ Telegram Markdown error. Please ensure your input doesn't cause formatting issues.`);
     }
     return ctx.reply(`❌ An error occurred: ${errorMsg}`);
   } catch (e) {
@@ -781,7 +780,7 @@ bot.command('register', async (ctx) => {
 
     const user = await registerUser(ctx.from.id, ctx.from.username, args, ctx.from.first_name);
 
-    return ctx.reply(`✅ *Registration Successful!*\n\n🎮 *In-Game Name:* ${user.in_game_name}\n🆔 *Telegram ID:* \`${user.telegram_id}\`\n🟢 *Status:* ${user.status}`, { parse_mode: 'Markdown' });
+    return safeReplyMarkdown(ctx, `✅ *Registration Successful!*\n\n🎮 *In-Game Name:* ${sanitizeMarkdown(user.in_game_name)}\n🆔 *Telegram ID:* \`${user.telegram_id}\`\n🟢 *Status:* ${user.status}`);
   } catch (err) {
     return ctx.reply(`❌ Error: ${err.message}`);
   }
