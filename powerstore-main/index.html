@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Store Bot - A Telegram Game of Strategy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the neon theme */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+        }
+
+        .neon-text {
+            color: #fff;
+            text-shadow:
+                0 0 5px #0ff,
+                0 0 10px #0ff,
+                0 0 20px #0ff,
+                0 0 40px #0ff,
+                0 0 80px #0ff;
+        }
+        
+        .neon-text-pink {
+             color: #fff;
+            text-shadow:
+                0 0 5px #f0f,
+                0 0 10px #f0f,
+                0 0 20px #f0f,
+                0 0 40px #f0f,
+                0 0 80px #f0f;
+        }
+
+        .neon-box {
+            border: 2px solid #0ff;
+            box-shadow: 0 0 15px #0ff;
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .neon-box:hover {
+            box-shadow: 0 0 25px #0ff, 0 0 40px #0ff;
+            transform: translateY(-5px);
+        }
+
+        .neon-button {
+            border: 2px solid #f0f;
+            color: #f0f;
+            text-shadow: 0 0 8px #f0f;
+            box-shadow: 0 0 10px #f0f;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .neon-button:hover {
+            background-color: #f0f;
+            color: #fff;
+            box-shadow: 0 0 20px #f0f, 0 0 30px #f0f;
+        }
+        
+        /* Custom scrollbar for a more thematic feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0ff;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0aa;
+        }
+    </style>
+</head>
+<body class="text-gray-200">
+
+    <!-- Header -->
+    <header class="bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold neon-text">Power Store Bot</h1>
+            <nav class="hidden md:flex space-x-8">
+                <a href="#about" class="hover:text-cyan-300 transition-colors">About</a>
+                <a href="#cards" class="hover:text-cyan-300 transition-colors">The Cards</a>
+                <a href="#commands" class="hover:text-cyan-300 transition-colors">Commands</a>
+            </nav>
+            <a href="https://t.me/msgcpowerstore_bot" target="_blank" class="hidden md:block bg-cyan-500 hover:bg-cyan-400 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-lg shadow-cyan-500/30">Add to Telegram</a>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <main class="container mx-auto px-6 py-16 md:py-24 text-center">
+        <h2 class="text-5xl md:text-7xl font-black uppercase neon-text-pink tracking-wider">COMMAND THE CURRENT</h2>
+        <p class="text-lg md:text-xl mt-4 max-w-3xl mx-auto text-gray-300">Harness raw energy in a Telegram game of strategy, shifting alliances, and calculated betrayal. Amass Power Coins, wield reality-bending cards, and short-circuit the competition to seize control of the leaderboard.</p>
+        <div class="mt-8">
+            <a href="https://t.me/msgcpowerstore_bot" target="_blank" class="neon-button font-bold text-lg py-3 px-8 rounded-lg inline-block">
+                ⚡️ Play Now ⚡️
+            </a>
+        </div>
+    </main>
+
+    <!-- About Section -->
+    <section id="about" class="py-20 bg-gray-900/60">
+        <div class="container mx-auto px-6">
+            <h3 class="text-4xl font-bold text-center mb-12 neon-text">HARNESS THE POWER</h3>
+            <div class="grid md:grid-cols-3 gap-8 text-center">
+                <div class="bg-gray-800 p-6 rounded-xl neon-box border-opacity-50">
+                    <div class="text-5xl mb-4">💰</div>
+                    <h4 class="text-2xl font-bold mb-2 text-cyan-300">AMASS ENERGY</h4>
+                    <p>Energy manifests as Power Coins. Generate them through simple group activity, tap into supercharged global events, and claim your daily energy surge.</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl neon-box border-opacity-50">
+                    <div class="text-5xl mb-4">🎴</div>
+                    <h4 class="text-2xl font-bold mb-2 text-cyan-300">WIELD THE ARCANA</h4>
+                    <p>Convert your coins into tangible power. Access the private /store to acquire an arsenal of game-altering cards, each a conduit for offensive or defensive maneuvers.</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl neon-box border-opacity-50">
+                    <div class="text-5xl mb-4">🏆</div>
+                    <h4 class="text-2xl font-bold mb-2 text-cyan-300">ASCEND TO DOMINANCE</h4>
+                    <p>Deploy your cards with tactical precision. Shield your assets, overload your rivals, and siphon their energy. Ascend the /leaderboard and etch your name in the annals of power.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cards Section -->
+    <section id="cards" class="py-20">
+        <div class="container mx-auto px-6">
+            <h3 class="text-4xl font-bold text-center mb-12 neon-text-pink">THE ARSENAL OF POWER</h3>
+            <div id="cards-grid" class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Cards will be dynamically inserted here by JavaScript -->
+            </div>
+        </div>
+    </section>
+    
+    <!-- Commands Section -->
+    <section id="commands" class="py-20 bg-gray-900/60">
+        <div class="container mx-auto px-6">
+            <h3 class="text-4xl font-bold text-center mb-12 neon-text">YOUR COMMAND CONSOLE</h3>
+            <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl neon-box p-6 md:p-8">
+                <ul class="space-y-4">
+                    <li><code class="bg-gray-900 text-cyan-300 p-1 rounded">/start</code> - Join the game and get your starter coins.</li>
+                    <li><code class="bg-gray-900 text-cyan-300 p-1 rounded">/profile</code> - Check your coins, cards, and status (in private chat).</li>
+                    <li><code class="bg-gray-900 text-cyan-300 p-1 rounded">/store</code> - Browse and buy power cards (in private chat).</li>
+                    <li><code class="bg-gray-900 text-cyan-300 p-1 rounded">/use &lt;CardName&gt;</code> - Use a card from your hand. Reply to a user to target them.</li>
+                    <li><code class="bg-gray-900 text-cyan-300 p-1 rounded">/leaderboard</code> - View the global coin leaderboard (in a group).</li>
+                    <li><code class="bg-gray-900 text-cyan-300 p-1 rounded">/help</code> - Shows the help message with all commands.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="text-center py-8">
+        <p>&copy; 2024 Power Store Bot. Control the flow.</p>
+    </footer>
+
+    <script>
+        // Power cards data extracted from your Python script
+        const POWER_CARDS = {
+            'speed': {'name': 'Speed', 'description': 'Reduces the cooldown time on your card usage by half for the next 10 hours.', 'price': 20, 'icon': '⚡️'},
+            'vision': {'name': 'Vision', 'description': 'Secretly view the card inventory and coin balance of a target player.', 'price': 20, 'icon': '👁️'},
+            'angel': {'name': 'Angel', 'description': 'Grant 20 Power Coins to another player at no cost to you.', 'price': 20, 'icon': '👼'},
+            'blackout': {'name': 'Blackout', 'description': 'For 12 hours, you are immune to Vision and Spotlight cards.', 'price': 25, 'icon': '🕶️'},
+            'reroll': {'name': 'Re-roll', 'description': 'Discard your entire hand to gain back 50% of its total coin value.', 'price': 15, 'icon': '♻️'},
+            'black_market': {'name': 'Black Market', 'description': 'For 2 minutes, all items in the store are 50% off for you.', 'price': 60, 'icon': '💰'},
+            'lottery_ticket': {'name': 'Lottery Ticket', 'description': 'A cheap card with a 2% chance to win 100 coins. A gamble for those feeling lucky.', 'price': 5, 'icon': '🎟️'},
+            'flame': {'name': 'Flame', 'description': 'Burn 15 Power Coins from a target player.', 'price': 25, 'icon': '🔥'},
+            'glitch': {'name': 'Glitch', 'description': 'Force a target player to randomly discard one of their cards.', 'price': 35, 'icon': '🌀'},
+            'shackle': {'name': 'Shackle', 'description': 'For 7 hours, your target is unable to use any cards.', 'price': 45, 'icon': '⛓️'},
+            'spotlight': {'name': 'Spotlight', 'description': 'Publicly reveal a target player\'s entire card inventory and coin balance to the group.', 'price': 25, 'icon': '💡'},
+            'time_warp': {'name': 'Time Warp', 'description': 'Immediately end an active Karma or Shackle effect on a target player.', 'price': 35, 'icon': '⏳'},
+            'mirage': {'name': 'Mirage', 'description': 'For 12 hours, Vision/Spotlight used on you will show a fake hand.', 'price': 30, 'icon': '🏜️'},
+            'dispel': {'name': 'Dispel', 'description': 'Immediately removes Shackle and personal Inflation effects from yourself.', 'price': 40, 'icon': '💨'},
+            'double_or_nothing': {'name': 'Double or Nothing', 'description': 'Target a player. You both secretly wager 40 coins. A coin is flipped; the winner takes the entire pot (80 coins).', 'price': 30, 'icon': '🎲'},
+            'forcefield': {'name': 'Forcefield', 'description': 'Block the next negative card used on you.', 'price': 45, 'icon': '🛡️'},
+            'trap': {'name': 'Trap', 'description': 'Set a trap. The next player to target you with a negative card has it nullified and loses 15 coins.', 'price': 55, 'icon': '🪤'},
+            'ricochet': {'name': 'Ricochet', 'description': 'For 10 hours, the next negative card used on you is redirected to a random other player in the game (not the original sender).', 'price': 50, 'icon': '↪️'},
+            'clairvoyance': { 'name': 'Clairvoyance', 'description': 'Reveal the true cards of a target user, even if they are hidden using Mirage. This card allows the user to bypass disguise effects and view the actual cards of the target in the bot\'s DM. Users under Blackout will remain unaffected.', 'price': 40, 'icon': '🔮'},
+            'devil': {'name': 'Devil', 'description': 'Steal 25 Power Coins from an opponent.', 'price': 50, 'icon': '😈'},
+            'karma': {'name': 'Karma', 'description': 'For 15 hours, any negative card used on you is reflected back to the sender.', 'price': 70, 'icon': '⚖️'},
+            'swap': {'name': 'Swap', 'description': 'Swap a random card from your hand with a random card from a target\'s hand.', 'price': 35, 'icon': '🔄'},
+            'steal': {'name': 'Steal', 'description': 'Steals a random card from the target user.', 'price': 45, 'icon': '🥷'},
+            'inflation': {'name': 'Inflation', 'description': 'For 12 hours, all card prices in the store are doubled for everyone but you.', 'price': 75, 'icon': '📈'},
+            'purge': {'name': 'Purge', 'description': 'Name a card. If your target has it, they are forced to discard it.', 'price': 60, 'icon': '🎯'},
+            'vortex': {'name': 'Vortex', 'description': 'All players in the game (including you) must immediately discard one random card.', 'price': 30, 'icon': '🌪️'},
+            'amnesia': {'name': 'Amnesia', 'description': 'Force a target player to discard their entire hand of cards.', 'price': 75, 'icon': '❓'},
+            'frenzy': {'name': 'Frenzy', 'description': 'Use your next two cards without a cooldown period.', 'price': 40, 'icon': '🔀'},
+            'god': {'name': 'God', 'description': 'Choose one of three powers: Blessing (give a Forcefield to yourself or a target), Smite (target loses half their coins), or Tribute (all other players pay you 5 coins).', 'price': 100, 'icon': '🛐'},
+        };
+
+        // Function to generate the card grid
+        function createCardGrid() {
+            const grid = document.getElementById('cards-grid');
+            if (!grid) return;
+
+            for (const cardId in POWER_CARDS) {
+                const card = POWER_CARDS[cardId];
+                const cardElement = document.createElement('div');
+                cardElement.className = 'bg-gray-800 p-6 rounded-xl neon-box border-opacity-50 flex flex-col';
+                
+                cardElement.innerHTML = `
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-start">
+                            <span class="text-4xl">${card.icon}</span>
+                            <span class="font-bold text-lg text-cyan-300">${card.price} PC</span>
+                        </div>
+                        <h4 class="text-2xl font-bold mt-4 mb-2 text-white">${card.name}</h4>
+                        <p class="text-gray-400 text-sm">${card.description}</p>
+                    </div>
+                `;
+                
+                grid.appendChild(cardElement);
+            }
+        }
+
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', createCardGrid);
+    </script>
+
+</body>
+</html>
+
+
+
