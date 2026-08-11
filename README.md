@@ -1,6 +1,6 @@
 # Telegram Tournament Management Bot
 
-A feature-packed Telegram Bot built with **Node.js**, **Telegraf**, and **Firebase Cloud Firestore** to organize esports / gaming tournaments, team registrations, status updates (Active/Eliminated), group chat integrations, and admin controls.
+A feature-packed Telegram Bot built with **Node.js**, **Telegraf**, and **Supabase** to organize esports / gaming tournaments, team registrations, status updates (Active/Eliminated), group chat integrations, and admin controls.
 
 ---
 
@@ -9,20 +9,15 @@ A feature-packed Telegram Bot built with **Node.js**, **Telegraf**, and **Fireba
 ### 1. Prerequisites
 - [Node.js](https://nodejs.org/) (v16 or higher)
 - A Telegram Bot Token from [@BotFather](https://t.me/BotFather)
-- A Firebase Project with Firestore Database enabled.
+- A [Supabase](https://supabase.com) database project.
 
-### 2. Firebase Configuration
-1. Go to your [Firebase Console](https://console.firebase.google.com/).
-2. Project Settings ⚙️ ➔ **Service accounts** tab.
-3. Click **Generate new private key** to download your JSON file.
-4. Rename the downloaded file to `serviceAccountKey.json` and place it in the root folder of this project (`d:\MSGC Bot\serviceAccountKey.json`).
-
-### 3. Environment Variables
+### 2. Environment Variables
 Rename or copy `.env.example` to `.env`:
 ```ini
 BOT_TOKEN=YOUR_BOT_TOKEN_FROM_BOTFATHER
 ADMIN_IDS=123456789,987654321
-FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json
+SUPABASE_URL=https://your-supabase-project.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
 ```
 *(Replace `123456789` with your actual Telegram User ID. You can find your ID via [@userinfobot](https://t.me/userinfobot)).*
 
@@ -67,9 +62,7 @@ node index.js
 ```
 d:\MSGC Bot\
 ├── .env.example              # Environment variables template
-├── firebase.js               # Firebase Firestore initializer
-├── db.js                     # Firestore CRUD operations & helper methods
+├── db.js                     # Supabase CRUD operations & helper methods
 ├── index.js                  # Telegraf bot handlers & Admin panel logic
-├── serviceAccountKey.json    # (Add your Firebase JSON key here)
 └── package.json
 ```
