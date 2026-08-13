@@ -562,15 +562,28 @@ bot.action('cmd_myteam', async (ctx) => {
     if (!team) return ctx.reply('❌ Team not found.');
 
     const statusEmoji = team.status === 'Active' ? '🟢' : '🔴';
-    let rosterMsg = `🛡️ *Team:* ${team.name} (${statusEmoji} ${team.status})\n🔑 *Join Code:* \`${team.join_code}\`\n\n👥 *Roster:*`;
+    const teamNameEsc = String(team.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let rosterMsg = `🛡️ <b>Team:</b> ${teamNameEsc} (${statusEmoji} ${team.status})\n🔑 <b>Join Code:</b> <code>${team.join_code}</code>\n\n👥 <b>Roster:</b>`;
 
     team.memberProfiles.forEach((p, idx) => {
-      const isCaptain = p.telegram_id === team.captain_id ? '👑 Captain' : '👤 Member';
+      const isCap = String(p.telegram_id) === String(team.captain_id) ? '👑 Captain' : '👤 Member';
       const playerEmoji = p.status === 'Active' ? '🟢' : '🔴';
-      const handle = formatPlayerHandle(p);
-      rosterMsg += `\n${idx + 1}. *${p.in_game_name}* (${handle}) - ${isCaptain} (${playerEmoji} ${p.status})`;
+      const ignEsc = String(p.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      rosterMsg += `\n${idx + 1}. <b>${ignEsc}</b> - ${isCap} (${playerEmoji} ${p.status})`;
     });
-    return safeReplyMarkdown(ctx, rosterMsg);
+
+    const isCaptain = String(team.captain_id) === String(ctx.from.id);
+    const buttons = [];
+
+    if (isCaptain) {
+      const nonCaptains = team.memberProfiles.filter(p => String(p.telegram_id) !== String(team.captain_id));
+      nonCaptains.forEach(p => {
+        buttons.push([Markup.button.callback(`🚫 Kick ${p.in_game_name}`, `captain_kick_${p.telegram_id}`)]);
+      });
+    }
+    buttons.push([Markup.button.callback('🏠 Main Menu', 'cmd_menu')]);
+
+    return ctx.replyWithHTML(rosterMsg, Markup.inlineKeyboard(buttons));
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
@@ -1211,9 +1224,36 @@ bot.command('kick', async (ctx) => {
       await bot.telegram.sendMessage(kickedUser.telegram_id, `🔴 You have been removed from team *${teamName}* by the Team Captain.`, { parse_mode: 'Markdown' });
     } catch (e) {}
 
-    return ctx.replyWithMarkdown(`🔴 *Player Kicked!*\n\n*${kickedUser.in_game_name}* has been removed from team *${teamName}*.`);
+    return ctx.replyWithHTML(`🔴 <b>Player Kicked!</b>\n\n<b>${kickedUser.in_game_name}</b> has been removed from team <b>${teamName}</b>.`);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
+  }
+});
+
+// Interactive inline button action for Captain kicking a team member
+bot.action(/^captain_kick_(\d+)$/, async (ctx) => {
+  const targetId = ctx.match[1];
+  try {
+    const user = await getUser(ctx.from.id);
+    if (!user || !user.team_id) return ctx.answerCbQuery('❌ You are not in any team.', { show_alert: true });
+
+    const team = await getTeamDetails(user.team_id);
+    if (!team) return ctx.answerCbQuery('❌ Team not found.', { show_alert: true });
+
+    if (String(team.captain_id) !== String(ctx.from.id) && !isAdmin(ctx)) {
+      return ctx.answerCbQuery('⛔ Only the Team Captain can kick players!', { show_alert: true });
+    }
+
+    const { user: kickedUser, teamName } = await kickPlayerFromTeam(targetId, team.id);
+    ctx.answerCbQuery(`Kicked ${kickedUser.in_game_name}`);
+
+    try {
+      await bot.telegram.sendMessage(kickedUser.telegram_id, `🔴 You have been removed from team <b>${teamName}</b> by your Team Captain.`, { parse_mode: 'HTML' });
+    } catch (e) {}
+
+    return ctx.replyWithHTML(`🔴 <b>Player Kicked!</b>\n\n<b>${kickedUser.in_game_name}</b> has been removed from team <b>${teamName}</b>.`);
+  } catch (err) {
+    return ctx.answerCbQuery(`❌ ${err.message}`, { show_alert: true });
   }
 });
 
@@ -1257,23 +1297,35 @@ bot.command('myteam', async (ctx) => {
   try {
     const user = await getUser(ctx.from.id);
     if (!user || !user.team_id) {
-      return ctx.reply('⚠️ You are not in any team yet. Create one with `/createteam` or join with `/jointeam`.', { parse_mode: 'Markdown' });
+      return ctx.replyWithHTML('⚠️ You are not in any team yet. Create one with <code>/createteam &lt;TeamName&gt;</code> or join with <code>/jointeam &lt;JoinCode&gt;</code>.');
     }
 
     const team = await getTeamDetails(user.team_id);
     if (!team) return ctx.reply('❌ Team not found.');
 
     const statusEmoji = team.status === 'Active' ? '🟢' : '🔴';
-    let rosterMsg = `🛡️ *Team:* ${team.name} (${statusEmoji} ${team.status})\n🔑 *Join Code:* \`${team.join_code}\`\n\n👥 *Roster:*`;
+    const teamNameEsc = String(team.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let rosterMsg = `🛡️ <b>Team:</b> ${teamNameEsc} (${statusEmoji} ${team.status})\n🔑 <b>Join Code:</b> <code>${team.join_code}</code>\n\n👥 <b>Roster:</b>`;
 
     team.memberProfiles.forEach((p, idx) => {
-      const isCaptain = p.telegram_id === team.captain_id ? '👑 Captain' : '👤 Member';
+      const isCap = String(p.telegram_id) === String(team.captain_id) ? '👑 Captain' : '👤 Member';
       const playerEmoji = p.status === 'Active' ? '🟢' : '🔴';
-      const handle = formatPlayerHandle(p);
-      rosterMsg += `\n${idx + 1}. *${p.in_game_name}* (${handle}) - ${isCaptain} (${playerEmoji} ${p.status})`;
+      const ignEsc = String(p.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      rosterMsg += `\n${idx + 1}. <b>${ignEsc}</b> - ${isCap} (${playerEmoji} ${p.status})`;
     });
 
-    return ctx.replyWithMarkdown(rosterMsg);
+    const isCaptain = String(team.captain_id) === String(ctx.from.id);
+    const buttons = [];
+
+    if (isCaptain) {
+      const nonCaptains = team.memberProfiles.filter(p => String(p.telegram_id) !== String(team.captain_id));
+      nonCaptains.forEach(p => {
+        buttons.push([Markup.button.callback(`🚫 Kick ${p.in_game_name}`, `captain_kick_${p.telegram_id}`)]);
+      });
+    }
+    buttons.push([Markup.button.callback('🏠 Main Menu', 'cmd_menu')]);
+
+    return ctx.replyWithHTML(rosterMsg, Markup.inlineKeyboard(buttons));
   } catch (err) {
     return ctx.reply(`❌ Error: ${err.message}`);
   }
