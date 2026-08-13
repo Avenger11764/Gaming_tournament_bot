@@ -346,20 +346,19 @@ bot.action('cmd_unregister_confirm', async (ctx) => {
   }
 });
 
-// /profile - View player profile, status, coins, and cards
+// /profile - View player profile, team, and status
 bot.command('profile', async (ctx) => {
   try {
     const user = await getUser(ctx.from.id);
     if (!user) {
-      return ctx.reply('⚠️ You are not registered yet. Use `/register <InGameName>` to join.', { parse_mode: 'Markdown' });
+      return ctx.replyWithHTML('⚠️ You are not registered yet. Use <code>/register &lt;InGameName&gt;</code> to join.');
     }
 
-    const cards = user.cards || [];
-    const cardsText = cards.length ? cards.join(', ') : 'None';
     const statusEmoji = user.status === 'Active' ? '🟢' : '🔴';
+    const ignEscaped = String(user.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    const text = `👤 *PLAYER PROFILE FOR ${user.in_game_name.toUpperCase()}*\n\n🎮 *In-Game Name:* ${user.in_game_name}\n🆔 *Telegram ID:* \`${user.telegram_id}\`\n${statusEmoji} *Status:* ${user.status}\n💰 *Power Coins:* \`${user.coins || 0} PC\`\n🎴 *Cards Hand:* ${cardsText}`;
-    return ctx.replyWithMarkdown(text, Markup.inlineKeyboard([
+    const text = `👤 <b>PLAYER PROFILE FOR ${ignEscaped.toUpperCase()}</b>\n\n🎮 <b>In-Game Name:</b> ${ignEscaped}\n🆔 <b>Telegram ID:</b> <code>${user.telegram_id}</code>\n${statusEmoji} <b>Status:</b> ${user.status}`;
+    return ctx.replyWithHTML(text, Markup.inlineKeyboard([
       [Markup.button.callback('🏠 Main Menu', 'cmd_menu')]
     ]));
   } catch (err) {
@@ -372,15 +371,14 @@ bot.action('cmd_profile', async (ctx) => {
   try {
     const user = await getUser(ctx.from.id);
     if (!user) {
-      return safeReplyMarkdown(ctx, '⚠️ You are not registered yet. Use `/register <InGameName>` to join.');
+      return ctx.replyWithHTML('⚠️ You are not registered yet. Use <code>/register &lt;InGameName&gt;</code> to join.');
     }
 
-    const cards = user.cards || [];
-    const cardsText = cards.length ? cards.join(', ') : 'None';
     const statusEmoji = user.status === 'Active' ? '🟢' : '🔴';
+    const ignEscaped = String(user.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    const text = `👤 *PLAYER PROFILE FOR ${user.in_game_name.toUpperCase()}*\n\n🎮 *In-Game Name:* ${user.in_game_name}\n🆔 *Telegram ID:* \`${user.telegram_id}\`\n${statusEmoji} *Status:* ${user.status}\n💰 *Power Coins:* \`${user.coins || 0} PC\`\n🎴 *Cards Hand:* ${cardsText}`;
-    return safeReplyMarkdown(ctx, text, Markup.inlineKeyboard([
+    const text = `👤 <b>PLAYER PROFILE FOR ${ignEscaped.toUpperCase()}</b>\n\n🎮 <b>In-Game Name:</b> ${ignEscaped}\n🆔 <b>Telegram ID:</b> <code>${user.telegram_id}</code>\n${statusEmoji} <b>Status:</b> ${user.status}`;
+    return ctx.replyWithHTML(text, Markup.inlineKeyboard([
       [Markup.button.callback('🏠 Main Menu', 'cmd_menu')]
     ]));
   } catch (err) {
