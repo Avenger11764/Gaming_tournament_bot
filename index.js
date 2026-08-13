@@ -80,10 +80,15 @@ bot.catch((err, ctx) => {
   console.error(`Unhandled error for ${ctx.updateType}:`, err);
   try {
     const errorMsg = err.message || 'Unknown error';
+    // Cleanly ignore or fallback plain text for Markdown entities parse errors
     if (errorMsg.includes("can't parse entities") || errorMsg.includes('Bad Request')) {
-      return ctx.reply(`❌ Telegram Markdown error. Please ensure your input doesn't cause formatting issues.`);
+      if (ctx.message && ctx.message.text) {
+        const cleanMsg = ctx.message.text.replace(/[*_`\[\]()~>#+\-=|{}.!]/g, '');
+        return ctx.reply(cleanMsg).catch(() => {});
+      }
+      return;
     }
-    return ctx.reply(`❌ An error occurred: ${errorMsg}`);
+    return ctx.reply(`❌ An error occurred: ${errorMsg}`).catch(() => {});
   } catch (e) {
     console.error('Failed to send error reply:', e);
   }
@@ -94,7 +99,7 @@ async function safeReplyMarkdown(ctx, text, extra = {}) {
   try {
     return await ctx.replyWithMarkdown(text, extra);
   } catch (err) {
-    const plainText = text.replace(/[*_`\[\]()~>#+\-=|{}.!]/g, '');
+    const plainText = String(text).replace(/[*_`\[\]()~>#+\-=|{}.!]/g, '');
     try {
       return await ctx.reply(plainText, extra);
     } catch (e) {
@@ -108,7 +113,7 @@ async function safeSendMessage(telegramId, text, extra = {}) {
   try {
     return await bot.telegram.sendMessage(telegramId, text, { parse_mode: 'Markdown', ...extra });
   } catch (err) {
-    const plainText = text.replace(/[*_`\[\]()~>#+\-=|{}.!]/g, '');
+    const plainText = String(text).replace(/[*_`\[\]()~>#+\-=|{}.!]/g, '');
     try {
       return await bot.telegram.sendMessage(telegramId, plainText, extra);
     } catch (e) {
