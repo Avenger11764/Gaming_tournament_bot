@@ -19,6 +19,8 @@ const {
   unregisterPlayer,
   setTeamStatus,
   setPlayerStatus,
+  recruitPlayerOrTeam,
+  deleteTeam,
   kickPlayerFromTeam,
   transferCaptainship,
   setRegistrationStatus,
@@ -30,6 +32,8 @@ const {
   addTeamScore,
   getLeaderboard,
   setTournamentRules,
+  addTournamentRule,
+  removeTournamentRuleByNumber,
   clearTournamentRules,
   getTournamentRules,
   declareChampion,
@@ -75,6 +79,18 @@ function formatPlayerHandle(p) {
     return sanitizeMarkdown(`@${p.username}`);
   }
   return sanitizeMarkdown(p.first_name || p.in_game_name || 'Player');
+}
+
+// Global Helper function to cleanly format player status (handles string or legacy JSON object)
+function formatPlayerStatus(status) {
+  if (!status) return 'Active';
+  if (typeof status === 'string') {
+    return status.trim() === 'Eliminated' ? 'Eliminated' : 'Active';
+  }
+  if (typeof status === 'object') {
+    return status.status === 'Eliminated' ? 'Eliminated' : 'Active';
+  }
+  return 'Active';
 }
 
 bot.catch((err, ctx) => {
@@ -360,10 +376,11 @@ bot.command('profile', async (ctx) => {
       return ctx.replyWithHTML('⚠️ You are not registered yet. Use <code>/register &lt;InGameName&gt;</code> to join.');
     }
 
-    const statusEmoji = user.status === 'Active' ? '🟢' : '🔴';
+    const cleanStatus = formatPlayerStatus(user.status);
+    const statusEmoji = cleanStatus === 'Active' ? '🟢' : '🔴';
     const ignEscaped = String(user.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    const text = `👤 <b>PLAYER PROFILE FOR ${ignEscaped.toUpperCase()}</b>\n\n🎮 <b>In-Game Name:</b> ${ignEscaped}\n🆔 <b>Telegram ID:</b> <code>${user.telegram_id}</code>\n${statusEmoji} <b>Status:</b> ${user.status}`;
+    const text = `👤 <b>PLAYER PROFILE FOR ${ignEscaped.toUpperCase()}</b>\n\n🎮 <b>In-Game Name:</b> ${ignEscaped}\n🆔 <b>Telegram ID:</b> <code>${user.telegram_id}</code>\n${statusEmoji} <b>Status:</b> ${cleanStatus}`;
     return ctx.replyWithHTML(text, Markup.inlineKeyboard([
       [Markup.button.callback('🏠 Main Menu', 'cmd_menu')]
     ]));
@@ -380,10 +397,11 @@ bot.action('cmd_profile', async (ctx) => {
       return ctx.replyWithHTML('⚠️ You are not registered yet. Use <code>/register &lt;InGameName&gt;</code> to join.');
     }
 
-    const statusEmoji = user.status === 'Active' ? '🟢' : '🔴';
+    const cleanStatus = formatPlayerStatus(user.status);
+    const statusEmoji = cleanStatus === 'Active' ? '🟢' : '🔴';
     const ignEscaped = String(user.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    const text = `👤 <b>PLAYER PROFILE FOR ${ignEscaped.toUpperCase()}</b>\n\n🎮 <b>In-Game Name:</b> ${ignEscaped}\n🆔 <b>Telegram ID:</b> <code>${user.telegram_id}</code>\n${statusEmoji} <b>Status:</b> ${user.status}`;
+    const text = `👤 <b>PLAYER PROFILE FOR ${ignEscaped.toUpperCase()}</b>\n\n🎮 <b>In-Game Name:</b> ${ignEscaped}\n🆔 <b>Telegram ID:</b> <code>${user.telegram_id}</code>\n${statusEmoji} <b>Status:</b> ${cleanStatus}`;
     return ctx.replyWithHTML(text, Markup.inlineKeyboard([
       [Markup.button.callback('🏠 Main Menu', 'cmd_menu')]
     ]));
@@ -407,38 +425,41 @@ async function renderLeaderboardText() {
     const soloPlayers = await getSoloLeaderboard();
     if (!soloPlayers.length) return 'ℹ️ No active players qualified for Solo Competition phase yet.';
 
-    let text = `👤 📊 *SOLO COMPETITION SCORECARD & LEADERBOARD* 📊 👤\n\n`;
-    text += `\`Rank | Player Name      | Solo Points\`\n`;
-    text += `\`────────────────────────────────────\`\n`;
+    let text = `👤 📊 <b>SOLO COMPETITION SCORECARD & LEADERBOARD</b> 📊 👤\n\n`;
+    text += `<code>Rank | Player Name      | Solo Points</code>\n`;
+    text += `<code>────────────────────────────────────</code>\n`;
 
     soloPlayers.forEach((p, idx) => {
       const rank = String(idx + 1).padStart(2, ' ');
       const name = (p.in_game_name.length > 18 ? p.in_game_name.substring(0, 15) + '...' : p.in_game_name).padEnd(18, ' ');
-      const pts = String(p.solo_score || 0).padStart(5, ' ');
-      text += `\`${rank}.  | ${name} | ${pts}\` 🟢\n`;
+      const scoreVal = p.coins !== undefined && p.coins !== null ? p.coins : (p.solo_score || 0);
+      const pts = String(scoreVal).padStart(5, ' ');
+      const ignEsc = name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      text += `<code>${rank}.  | ${ignEsc} | ${pts}</code> 🟢\n`;
     });
 
-
-    text += `\n👤 *Mode:* Solo Competition (Active Players Only)`;
+    text += `\n👤 <b>Mode:</b> Solo Competition (Active Players Only)`;
     return text;
   } else {
     const teams = await getLeaderboard();
     if (!teams.length) return 'ℹ️ No teams registered yet for leaderboard.';
 
-    let text = `🛡️ 📊 *TEAM TOURNAMENT SCORECARD & LEADERBOARD* 📊 🛡️\n\n`;
-    text += `\`Rank | Team Name        | Total Points\`\n`;
-    text += `\`────────────────────────────────────\`\n`;
+    let text = `🛡️ 📊 <b>TEAM TOURNAMENT SCORECARD & LEADERBOARD</b> 📊 🛡️\n\n`;
+    text += `<code>Rank | Team Name        | Pts | W  | L </code>\n`;
+    text += `<code>───────────────────────────────────────</code>\n`;
 
     teams.forEach((t, idx) => {
       const rank = String(idx + 1).padStart(2, ' ');
-      const name = (t.name.length > 18 ? t.name.substring(0, 15) + '...' : t.name).padEnd(18, ' ');
-      const pts = String(t.points || 0).padStart(5, ' ');
+      const name = (t.name.length > 14 ? t.name.substring(0, 11) + '...' : t.name).padEnd(14, ' ');
+      const pts = String(t.points || 0).padStart(3, ' ');
+      const wins = String(t.wins || 0).padStart(2, ' ');
+      const losses = String(t.losses || 0).padStart(2, ' ');
       const statusEmoji = t.status === 'Active' ? '🟢' : '🔴';
 
-      text += `\`${rank}.  | ${name} | ${pts}\` ${statusEmoji}\n`;
+      text += `<code>${rank}.  | ${name} | ${pts} | ${wins} | ${losses}</code> ${statusEmoji}\n`;
     });
 
-    text += `\n🟢 = Active | 🔴 = Eliminated`;
+    text += `\n🟢 = Active | 🔴 = Eliminated\n<i>W = Matches Won | L = Matches Lost</i>`;
     return text;
   }
 }
@@ -447,7 +468,7 @@ async function renderLeaderboardText() {
 bot.command('leaderboard', async (ctx) => {
   try {
     const text = await renderLeaderboardText();
-    return safeReplyMarkdown(ctx, text);
+    return ctx.replyWithHTML(text);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
@@ -457,7 +478,7 @@ bot.action('cmd_leaderboard', async (ctx) => {
   ctx.answerCbQuery();
   try {
     const text = await renderLeaderboardText();
-    return safeReplyMarkdown(ctx, text);
+    return ctx.replyWithHTML(text);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
@@ -489,48 +510,57 @@ bot.command('setmode', async (ctx) => {
     let broadcastMsg = '';
 
     if (newMode === 'solo') {
-      const activePlayers = await getSoloLeaderboard();
-      broadcastMsg = `🔥 👤 *TOURNAMENT MODE CHANGED TO SOLO COMPETITION!* 👤 🔥\n\nTeam games have ended! All **${activePlayers.length} Active Players** have qualified for the Solo Competition Phase!\n\nCheck live solo standings with \`/leaderboard\`!`;
+      const allPlayers = await getAllPlayers();
+      const activePlayers = allPlayers.filter(p => formatPlayerStatus(p.status) === 'Active');
+      broadcastMsg = `🔥 👤 <b>TOURNAMENT MODE CHANGED TO SOLO COMPETITION!</b> 👤 🔥\n\nTeam games have ended! All <b>${activePlayers.length} Active Players</b> are now active in the Solo Competition Phase!\n\nCheck live solo standings with <code>/leaderboard</code>!`;
     } else {
-      broadcastMsg = `🛡️ *TOURNAMENT MODE CHANGED TO TEAM COMPETITION!* 🛡️\n\nCheck live team standings with \`/leaderboard\`!`;
+      broadcastMsg = `🛡️ <b>TOURNAMENT MODE CHANGED TO TEAM COMPETITION!</b> 🛡️\n\nCheck live team standings with <code>/leaderboard</code>!`;
     }
 
     // Broadcast mode change to all players
     const players = await getAllPlayers();
     for (const p of players) {
       try {
-        await bot.telegram.sendMessage(p.telegram_id, broadcastMsg, { parse_mode: 'Markdown' });
+        await bot.telegram.sendMessage(p.telegram_id, broadcastMsg, { parse_mode: 'HTML' });
       } catch (e) {}
     }
 
-    return safeReplyMarkdown(ctx, broadcastMsg);
+    return ctx.replyWithHTML(broadcastMsg);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
 });
 
 
-// Admin Command: /addsoloscore <PlayerIGN_or_Handle> <Points>
-bot.command('addsoloscore', async (ctx) => {
+// Admin Command: /addsoloscore or /soloscore <PlayerIGN_or_Handle> <Points>
+const handleAddSoloScore = async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
-  const args = ctx.message.text.split(' ').slice(1);
+  const text = ctx.message.text.trim().replace(/^\/(addsoloscore|soloscore)/i, '').trim();
+  const lastSpaceIndex = text.lastIndexOf(' ');
 
-  if (args.length < 2) {
-    return ctx.reply('⚠️ Usage: `/addsoloscore <PlayerIGN_or_Handle> <PointsToAdd>`\n\nExample: `/addsoloscore Raven 15`', { parse_mode: 'Markdown' });
+  if (lastSpaceIndex === -1) {
+    return ctx.replyWithHTML('⚠️ Usage: <code>/addsoloscore &lt;PlayerIGN_or_Handle&gt; &lt;Points&gt;</code>\n\nExample: <code>/addsoloscore Raven 15</code> (or <code>-5</code> to deduct)');
   }
 
-  const playerInput = args[0];
-  const points = parseInt(args[1], 10);
-  if (isNaN(points)) return ctx.reply('❌ Points must be a valid number!');
+  const playerInput = text.substring(0, lastSpaceIndex).trim();
+  const points = parseInt(text.substring(lastSpaceIndex + 1).trim(), 10);
+
+  if (isNaN(points)) {
+    return ctx.reply('❌ Points must be a valid number!');
+  }
 
   try {
     const updatedUser = await addSoloScore(playerInput, points);
-    const handle = formatPlayerHandle(updatedUser);
-    return ctx.replyWithMarkdown(`🎯 *Solo Points Added!*\n\n👤 *Player:* ${updatedUser.in_game_name} (${handle})\n➕ *Added:* +${points} Solo Points\n📊 *Total Solo Points:* \`${updatedUser.solo_points || 0} Pts\``);
+    const ignEsc = String(updatedUser.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sign = points >= 0 ? `+${points}` : `${points}`;
+    return ctx.replyWithHTML(`🎯 <b>Solo Points Updated!</b>\n\n👤 <b>Player:</b> ${ignEsc}\n➕ <b>Points Change:</b> ${sign} Solo Points\n📊 <b>Total Solo Points:</b> <code>${updatedUser.solo_score || 0} Pts</code>`);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
-});
+};
+
+bot.command('addsoloscore', handleAddSoloScore);
+bot.command('soloscore', handleAddSoloScore);
 
 
 
@@ -568,9 +598,10 @@ bot.action('cmd_myteam', async (ctx) => {
 
     team.memberProfiles.forEach((p, idx) => {
       const isCap = String(p.telegram_id) === String(team.captain_id) ? '👑 Captain' : '👤 Member';
-      const playerEmoji = p.status === 'Active' ? '🟢' : '🔴';
+      const cleanPStatus = formatPlayerStatus(p.status);
+      const playerEmoji = cleanPStatus === 'Active' ? '🟢' : '🔴';
       const ignEsc = String(p.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      rosterMsg += `\n${idx + 1}. <b>${ignEsc}</b> - ${isCap} (${playerEmoji} ${p.status})`;
+      rosterMsg += `\n${idx + 1}. <b>${ignEsc}</b> - ${isCap} (${playerEmoji} ${cleanPStatus})`;
     });
 
     const isCaptain = String(team.captain_id) === String(ctx.from.id);
@@ -747,7 +778,9 @@ Welcome! Here is a full breakdown of every command available in the bot and how 
 • \`/setwinner <MatchID_or_Team> <WinnerTeam>\` - Record match winner.
 • \`/addscore <TeamName> <Points>\` - Add or deduct score points (+10 or -5).
 • \`/openreg\` & \`/closereg\` - Lock or open player registration.
-• \`/setrules <Rules>\` & \`/removerules\` - Set or remove official tournament rules.
+• \`/addrule <RuleText>\` - Add a new numbered rule (1, 2, 3...) to the dictionary.
+• \`/removerule <RuleNumber>\` - Delete a specific rule by number (e.g. \`/removerule 2\`).
+• \`/clearallrules\` - Remove all rules from the dictionary.
 • \`/champion <TeamName>\` - Declare official tournament winner and send victory broadcast.
 • \`/broadcast <Message>\` - Send announcement to all players & group chats.
   `;
@@ -910,28 +943,49 @@ bot.command('editmatch', async (ctx) => {
   }
 });
 
-// Admin Command: /addscore <TeamName> <Points>
+// Admin Command: /addscore <TeamName_or_PlayerIGN> <Points>
 bot.command('addscore', async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
   const text = ctx.message.text.trim().replace(/^\/addscore/i, '').trim();
   const lastSpaceIndex = text.lastIndexOf(' ');
 
   if (lastSpaceIndex === -1) {
-    return ctx.replyWithHTML('⚠️ Usage: <code>/addscore &lt;TeamName&gt; &lt;Points&gt;</code>\n\nExample: <code>/addscore Warriors 10</code>');
+    return ctx.replyWithHTML('⚠️ Usage: <code>/addscore &lt;TeamName_or_PlayerIGN&gt; &lt;Points&gt;</code>\n\nExample: <code>/addscore Warriors 10</code> or <code>/addscore Raven 15</code>');
   }
 
-  const teamName = text.substring(0, lastSpaceIndex).trim();
+  const targetInput = text.substring(0, lastSpaceIndex).trim();
   const points = parseInt(text.substring(lastSpaceIndex + 1).trim(), 10);
 
   if (isNaN(points)) {
     return ctx.reply('❌ Points must be a valid number!');
   }
 
+  const mode = await getTournamentMode();
+
+  if (mode === 'solo') {
+    try {
+      const updatedUser = await addSoloScore(targetInput, points);
+      const ignEsc = String(updatedUser.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const sign = points >= 0 ? `+${points}` : `${points}`;
+      return ctx.replyWithHTML(`🎯 <b>Solo Score Updated!</b>\n\n👤 <b>Player:</b> ${ignEsc}\n➕ <b>Points Change:</b> ${sign} Pts\n📊 <b>Total Solo Score:</b> <code>${updatedUser.solo_score || 0} Pts</code>`);
+    } catch (err) {
+      return ctx.reply(`❌ ${err.message}`);
+    }
+  }
+
+  // Team mode default, with fallback to solo player lookup if team not found
   try {
-    const updatedTeam = await addTeamScore(teamName, points);
-    return ctx.replyWithHTML(`🎯 <b>Score Updated!</b>\n\n🛡️ <b>Team:</b> ${updatedTeam.name}\n➕ <b>Added:</b> +${points} Pts\n📊 <b>Total Points:</b> <code>${updatedTeam.points} Pts</code>`);
+    const updatedTeam = await addTeamScore(targetInput, points);
+    return ctx.replyWithHTML(`🎯 <b>Team Score Updated!</b>\n\n🛡️ <b>Team:</b> ${updatedTeam.name}\n➕ <b>Added:</b> +${points} Pts\n📊 <b>Total Points:</b> <code>${updatedTeam.points} Pts</code>`);
   } catch (err) {
-    return ctx.reply(`❌ ${err.message}`);
+    try {
+      const updatedUser = await addSoloScore(targetInput, points);
+      const ignEsc = String(updatedUser.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const sign = points >= 0 ? `+${points}` : `${points}`;
+      return ctx.replyWithHTML(`🎯 <b>Solo Score Updated!</b>\n\n👤 <b>Player:</b> ${ignEsc}\n➕ <b>Points Change:</b> ${sign} Pts\n📊 <b>Total Solo Score:</b> <code>${updatedUser.solo_score || 0} Pts</code>`);
+    } catch (e) {
+      return ctx.reply(`❌ ${err.message}`);
+    }
   }
 });
 
@@ -979,7 +1033,7 @@ bot.command('leaderboard', async (ctx) => {
 bot.command('rules', async (ctx) => {
   try {
     const rulesText = await getTournamentRules();
-    return safeReplyMarkdown(ctx, rulesText);
+    return ctx.replyWithHTML(rulesText);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
@@ -989,72 +1043,113 @@ bot.action('cmd_rules', async (ctx) => {
   ctx.answerCbQuery();
   try {
     const rulesText = await getTournamentRules();
-    return safeReplyMarkdown(ctx, rulesText);
+    return ctx.replyWithHTML(rulesText);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
 });
 
 
-// Admin Command: /setrules <RulesText>
-bot.command('setrules', async (ctx) => {
+// Admin Command: /addrule or /setrules <RuleText> - Add a numbered rule to rules dictionary
+const handleAddRule = async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
-  const rulesText = ctx.message.text.trim().replace('/setrules', '').trim();
-  if (!rulesText) return ctx.reply('⚠️ Usage: `/setrules <Write official tournament rules here...>`', { parse_mode: 'Markdown' });
-
-  try {
-    await setTournamentRules(rulesText);
-    return ctx.replyWithMarkdown('📜 *Official Tournament Rules Updated Successfully!* Players can view them using `/rules`.');
-  } catch (err) {
-    return ctx.reply(`❌ ${err.message}`);
+  const ruleText = ctx.message.text.trim().replace(/^\/(addrule|setrules)/i, '').trim();
+  if (!ruleText) {
+    return ctx.replyWithHTML('⚠️ Usage: <code>/addrule &lt;Write rule text here...&gt;</code>\n\nExample: <code>/addrule No teaming up with enemy squads.</code>');
   }
-});
 
-// Admin Command: /removerules or /delrules - Remove/Reset tournament rules
-const handleRemoveRules = async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
   try {
-    await clearTournamentRules();
-    return ctx.replyWithHTML('📜 <b>Tournament Rules Cleared Successfully!</b>\n\nPlayers viewing <code>/rules</code> will now see that no active rules are set.');
+    const result = await addTournamentRule(ruleText);
+    return ctx.replyWithHTML(`📜 <b>Rule #${result.ruleNumber} Added Successfully!</b>\n\n<b>Text:</b> ${ruleText}\n📊 <b>Total Active Rules:</b> ${result.totalRules}\n\nPlayers can view updated dictionary using <code>/rules</code>.`);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
 };
 
-bot.command('removerules', handleRemoveRules);
-bot.command('delrules', handleRemoveRules);
+bot.command('addrule', handleAddRule);
+bot.command('setrules', handleAddRule);
 
-// Admin Command: /champion <TeamName> - Declare official tournament winner
-bot.command('champion', async (ctx) => {
+// Admin Command: /removerule or /delrule <RuleNumber> - Remove specific rule by index
+const handleRemoveSingleRule = async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
-  const args = ctx.message.text.split(' ').slice(1).join(' ');
-  if (!args) return ctx.reply('⚠️ Usage: `/champion <WinningTeamName>`', { parse_mode: 'Markdown' });
+  const text = ctx.message.text.trim().replace(/^\/(removerule|delrule)/i, '').trim();
+  const ruleNum = parseInt(text, 10);
+
+  if (isNaN(ruleNum)) {
+    return ctx.replyWithHTML('⚠️ Usage: <code>/removerule &lt;RuleNumber&gt;</code>\n\nExample: <code>/removerule 2</code> (Removes Rule #2)');
+  }
 
   try {
-    const winnerTeam = await declareChampion(args);
-    const teamDetails = await getTeamDetails(winnerTeam.id);
+    const { removedRule, remainingRules } = await removeTournamentRuleByNumber(ruleNum);
+    return ctx.replyWithHTML(`🗑️ <b>Rule #${ruleNum} Removed!</b>\n\n<b>Removed Text:</b> ${removedRule}\n📊 <b>Remaining Rules:</b> ${remainingRules.length}\n\nRemaining rules have been re-indexed automatically (1, 2, 3...).`);
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
+  }
+};
 
-    let victoryMsg = `👑 🏆 *TOURNAMENT CHAMPION DECLARED!* 🏆 👑\n\n`;
-    victoryMsg += `🎉 *CONGRATULATIONS TO TEAM ${winnerTeam.name.toUpperCase()}!* 🎉\n\n`;
-    victoryMsg += `👥 *CHAMPION ROSTER:*\n`;
+bot.command('removerule', handleRemoveSingleRule);
+bot.command('delrule', handleRemoveSingleRule);
 
-    if (teamDetails && teamDetails.memberProfiles) {
-      teamDetails.memberProfiles.forEach((p, idx) => {
-        victoryMsg += `${idx + 1}. *${p.in_game_name}* (@${p.username || 'N/A'})\n`;
-      });
+// Admin Command: /clearallrules or /removerules - Clear all rules completely
+const handleRemoveAllRules = async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
+  try {
+    await clearTournamentRules();
+    return ctx.replyWithHTML('📜 <b>All Tournament Rules Cleared Successfully!</b>\n\nPlayers viewing <code>/rules</code> will now see that no active rules are set.');
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
+  }
+};
+
+bot.command('clearallrules', handleRemoveAllRules);
+bot.command('removerules', handleRemoveAllRules);
+
+// Admin Command: /champion <TeamName_or_PlayerIGN> - Declare official tournament winner
+bot.command('champion', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
+  const args = ctx.message.text.split(' ').slice(1).join(' ').trim();
+  if (!args) return ctx.replyWithHTML('⚠️ Usage: <code>/champion &lt;WinningTeamName_or_PlayerIGN&gt;</code>');
+
+  try {
+    const res = await declareChampion(args);
+    let victoryMsg = `👑 🏆 <b>TOURNAMENT CHAMPION DECLARED!</b> 🏆 👑\n\n`;
+
+    if (res.type === 'team') {
+      const winnerTeam = res.entity;
+      const teamDetails = await getTeamDetails(winnerTeam.id);
+      const teamNameEsc = String(winnerTeam.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      
+      victoryMsg += `🎉 <b>CONGRATULATIONS TO TEAM ${teamNameEsc.toUpperCase()}!</b> 🎉\n\n`;
+      victoryMsg += `👥 <b>CHAMPION ROSTER:</b>\n`;
+
+      if (teamDetails && teamDetails.memberProfiles) {
+        teamDetails.memberProfiles.forEach((p, idx) => {
+          const handle = formatPlayerHandle(p);
+          const ignEsc = String(p.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          victoryMsg += `${idx + 1}. <b>${ignEsc}</b> (${handle})\n`;
+        });
+      }
+    } else {
+      const winnerPlayer = res.entity;
+      const ignEsc = String(winnerPlayer.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const handle = formatPlayerHandle(winnerPlayer);
+
+      victoryMsg += `🎉 <b>CONGRATULATIONS TO THE SOLO CHAMPION: ${ignEsc.toUpperCase()}!</b> 🎉\n\n`;
+      victoryMsg += `👤 <b>Player:</b> <b>${ignEsc}</b> (${handle})\n`;
+      victoryMsg += `📊 <b>Final Solo Score:</b> <code>${winnerPlayer.solo_score || 0} Pts</code>\n`;
     }
 
-    victoryMsg += `\n🌟 *Thank you to all participating teams and players!* 🌟`;
+    victoryMsg += `\n🌟 <b>Thank you to all participating teams and players!</b> 🌟`;
 
-    // Broadcast champion victory message to all players & groups!
+    // Broadcast champion victory message to all players
     const players = await getAllPlayers();
     for (const p of players) {
       try {
-        await bot.telegram.sendMessage(p.telegram_id, victoryMsg, { parse_mode: 'Markdown' });
+        await bot.telegram.sendMessage(p.telegram_id, victoryMsg, { parse_mode: 'HTML' });
       } catch (e) {}
     }
 
-    return safeReplyMarkdown(ctx, victoryMsg);
+    return ctx.replyWithHTML(victoryMsg);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
@@ -1379,7 +1474,7 @@ bot.action(/^captain_kick_(\d+)$/, async (ctx) => {
 
 
 
-// /players - Show player stats
+// /players - Show player stats & statuses
 bot.command('players', async (ctx) => {
   try {
     const players = await getAllPlayers();
@@ -1389,23 +1484,23 @@ bot.command('players', async (ctx) => {
     let elimCount = 0;
     
     players.forEach(p => {
-      const statusText = (typeof p.status === 'string' ? p.status : 'Active') === 'Eliminated' ? 'Eliminated' : 'Active';
-      if (statusText === 'Active') activeCount++; else elimCount++;
+      const cleanStatus = formatPlayerStatus(p.status);
+      if (cleanStatus === 'Active') activeCount++; else elimCount++;
     });
 
-    let msg = `👥 *Tournament Players Overview* 👥\n\n🟢 *Active Players:* ${activeCount}\n🔴 *Eliminated Players:* ${elimCount}\n📊 *Total Registered:* ${players.length}\n\n`;
+    let msg = `👥 <b>Tournament Players Overview</b> 👥\n\n🟢 <b>Active Players:</b> ${activeCount}\n🔴 <b>Eliminated Players:</b> ${elimCount}\n📊 <b>Total Registered:</b> ${players.length}\n\n`;
     
-    players.slice(0, 25).forEach((p, i) => {
-      const statusText = (typeof p.status === 'string' ? p.status : 'Active') === 'Eliminated' ? 'Eliminated' : 'Active';
-      const emoji = statusText === 'Active' ? '🟢' : '🔴';
+    players.slice(0, 30).forEach((p, i) => {
+      const cleanStatus = formatPlayerStatus(p.status);
+      const emoji = cleanStatus === 'Active' ? '🟢' : '🔴';
       const handle = formatPlayerHandle(p);
-      const safeIGN = sanitizeMarkdown(p.in_game_name);
-      msg += `${i + 1}. *${safeIGN}* (${handle}) - ${emoji} ${statusText}\n`;
+      const ignEsc = String(p.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      msg += `${i + 1}. <b>${ignEsc}</b> (${handle}) - ${emoji} ${cleanStatus}\n`;
     });
 
-    if (players.length > 25) msg += `\n...and ${players.length - 25} more players.`;
+    if (players.length > 30) msg += `\n...and ${players.length - 30} more players.`;
 
-    return safeReplyMarkdown(ctx, msg);
+    return ctx.replyWithHTML(msg);
   } catch (err) {
     return ctx.reply(`❌ Error: ${err.message}`);
   }
@@ -1429,9 +1524,10 @@ bot.command('myteam', async (ctx) => {
 
     team.memberProfiles.forEach((p, idx) => {
       const isCap = String(p.telegram_id) === String(team.captain_id) ? '👑 Captain' : '👤 Member';
-      const playerEmoji = p.status === 'Active' ? '🟢' : '🔴';
+      const cleanPStatus = formatPlayerStatus(p.status);
+      const playerEmoji = cleanPStatus === 'Active' ? '🟢' : '🔴';
       const ignEsc = String(p.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      rosterMsg += `\n${idx + 1}. <b>${ignEsc}</b> - ${isCap} (${playerEmoji} ${p.status})`;
+      rosterMsg += `\n${idx + 1}. <b>${ignEsc}</b> - ${isCap} (${playerEmoji} ${cleanPStatus})`;
     });
 
     const isCaptain = String(team.captain_id) === String(ctx.from.id);
@@ -1985,6 +2081,7 @@ bot.action(/adm_t_view_(.+)/, async (ctx) => {
   // Team-wide actions
   const toggleTeamText = team.status === 'Active' ? '🔴 Eliminate Entire Team' : '🟢 Restore Entire Team';
   buttons.push([Markup.button.callback(toggleTeamText, `adm_t_toggle_${team.id}`)]);
+  buttons.push([Markup.button.callback('🗑️ Delete Team Completely', `adm_t_del_${team.id}`)]);
   buttons.push([Markup.button.callback('⬅️ Back to Teams List', 'admin_teams')]);
 
   return ctx.editMessageText(text, {
@@ -2074,41 +2171,77 @@ bot.action(/adm_p_capt_(.+)_(.+)/, async (ctx) => {
 });
 
 
-// Admin Command: /eliminate <TeamName>
-bot.command('eliminate', async (ctx) => {
+// Admin Delete Team Completely
+bot.action(/adm_t_del_(.+)/, async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Access Denied');
+  const teamId = ctx.match[1];
+  try {
+    const team = await deleteTeam(teamId);
+    ctx.answerCbQuery(`Team ${team.name} deleted`);
+    return ctx.editMessageText(`🗑️ <b>Team ${team.name}</b> has been completely deleted from the tournament!`, {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Back to Teams List', 'admin_teams')]])
+    });
+  } catch (err) {
+    return ctx.answerCbQuery(`❌ ${err.message}`, { show_alert: true });
+  }
+});
+
+// Admin Command: /eliminate or /eilimnate or /elim <TeamNameOrIGN>
+const handleEliminate = async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
   const args = ctx.message.text.split(' ').slice(1).join(' ');
-  if (!args) return ctx.reply('⚠️ Usage: `/eliminate <TeamNameOrPlayerIGN>`', { parse_mode: 'Markdown' });
+  if (!args) return ctx.replyWithHTML('⚠️ Usage: <code>/eliminate &lt;TeamNameOrPlayerIGN&gt;</code>');
 
   try {
     const team = await setTeamStatus(args, 'Eliminated');
-    return ctx.replyWithMarkdown(`🔴 Team *${team.name}* and all its members have been **Eliminated**!`);
+    return ctx.replyWithHTML(`🔴 <b>Team ${team.name}</b> and all its members have been marked as <b>Eliminated</b>!`);
   } catch (err) {
     try {
       const player = await setPlayerStatus(args, 'Eliminated');
-      return ctx.replyWithMarkdown(`🔴 Player *${player.in_game_name}* has been **Eliminated**!`);
+      return ctx.replyWithHTML(`🔴 <b>Player ${player.in_game_name}</b> has been marked as <b>Eliminated</b>!`);
     } catch (e) {
       return ctx.reply(`❌ ${err.message}`);
     }
   }
-});
+};
 
-// Admin Command: /restore <TeamName>
-bot.command('restore', async (ctx) => {
+bot.command('eliminate', handleEliminate);
+bot.command('eilimnate', handleEliminate);
+bot.command('elim', handleEliminate);
+
+// Admin Command: /recruit or /restore <TeamNameOrIGN> - Recruit/Restore eliminated player or team back into tournament
+const handleRecruit = async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
   const args = ctx.message.text.split(' ').slice(1).join(' ');
-  if (!args) return ctx.reply('⚠️ Usage: `/restore <TeamNameOrPlayerIGN>`', { parse_mode: 'Markdown' });
+  if (!args) return ctx.replyWithHTML('⚠️ Usage: <code>/recruit &lt;TeamNameOrPlayerIGN&gt;</code>');
 
   try {
-    const team = await setTeamStatus(args, 'Active');
-    return ctx.replyWithMarkdown(`🟢 Team *${team.name}* and its members have been restored to **Active**!`);
-  } catch (err) {
-    try {
-      const player = await setPlayerStatus(args, 'Active');
-      return ctx.replyWithMarkdown(`🟢 Player *${player.in_game_name}* has been restored to **Active**!`);
-    } catch (e) {
-      return ctx.reply(`❌ ${err.message}`);
+    const res = await recruitPlayerOrTeam(args);
+    if (res.type === 'team') {
+      return ctx.replyWithHTML(`🟢 <b>Team ${res.entity.name}</b> and all its members have been <b>Recruited Back & Restored to Active!</b>`);
+    } else {
+      return ctx.replyWithHTML(`🟢 <b>Player ${res.entity.in_game_name}</b> has been <b>Recruited Back & Restored to Active!</b>`);
     }
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
+  }
+};
+
+bot.command('recruit', handleRecruit);
+bot.command('restore', handleRecruit);
+
+// Admin Command: /removeteam <TeamName> - Delete team completely
+bot.command('removeteam', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
+  const args = ctx.message.text.split(' ').slice(1).join(' ');
+  if (!args) return ctx.replyWithHTML('⚠️ Usage: <code>/removeteam &lt;TeamName&gt;</code>');
+
+  try {
+    const team = await deleteTeam(args);
+    return ctx.replyWithHTML(`🗑️ <b>Team ${team.name}</b> has been completely removed from the tournament!`);
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
   }
 });
 

@@ -418,13 +418,22 @@ async function leaveTeam(userId) {
   return team.name;
 }
 
-// Kick player from team
+// Kick/Remove player from team or tournament
 async function kickPlayerFromTeam(playerInput, captainTeamId = null) {
   const { data: players } = await supabase.from('users').select('*');
   let targetUser = (players || []).find(p => p.in_game_name === playerInput || p.username === playerInput.replace('@', '') || String(p.telegram_id) === String(playerInput));
 
   if (!targetUser) throw new Error(`Player '${playerInput}' not found.`);
-  if (!targetUser.team_id) throw new Error(`Player '${targetUser.in_game_name}' is not in any team.`);
+
+  // If player is not in any team
+  if (!targetUser.team_id) {
+    if (captainTeamId) {
+      throw new Error(`Player '${targetUser.in_game_name}' is not in your team.`);
+    }
+    // Admin removing a standalone player: unregister them from tournament
+    await supabase.from('users').update({ msgc_registered: false, status: 'Eliminated' }).eq('telegram_id', String(targetUser.telegram_id));
+    return { user: targetUser, teamName: 'No Team (Standalone Player)' };
+  }
 
   if (captainTeamId && targetUser.team_id !== captainTeamId) {
     throw new Error(`Player '${targetUser.in_game_name}' is not in your team!`);
@@ -436,15 +445,17 @@ async function kickPlayerFromTeam(playerInput, captainTeamId = null) {
     .eq('id', targetUser.team_id)
     .single();
 
-  if (String(targetUser.telegram_id) === String(team.captain_id)) {
-    throw new Error('The Team Captain cannot be kicked! Transfer captainship first using `/makecaptain`.');
+  if (team && String(targetUser.telegram_id) === String(team.captain_id) && captainTeamId) {
+    throw new Error('The Team Captain cannot be kicked by himself! Transfer captainship first using `/makecaptain`.');
   }
 
-  const updatedMembers = (team.members || []).filter(m => m !== String(targetUser.telegram_id));
-  await supabase.from('teams').update({ members: updatedMembers }).eq('id', team.id);
+  if (team) {
+    const updatedMembers = (team.members || []).filter(m => m !== String(targetUser.telegram_id));
+    await supabase.from('teams').update({ members: updatedMembers }).eq('id', team.id);
+  }
   await supabase.from('users').update({ team_id: null }).eq('telegram_id', String(targetUser.telegram_id));
 
-  return { user: targetUser, teamName: team.name };
+  return { user: targetUser, teamName: team ? team.name : 'Team' };
 }
 
 // Transfer Captainship
@@ -474,7 +485,9 @@ async function setTeamStatus(teamName, status) {
   await supabase.from('teams').update({ status }).eq('id', team.id);
   const members = team.members || [];
   if (members.length) {
-    await supabase.from('users').update({ status }).in('telegram_id', members);
+    const isEliminated = status === 'Eliminated';
+    const updatePayload = isEliminated ? { status: 'Eliminated', msgc_registered: false } : { status: 'Active', msgc_registered: true };
+    await supabase.from('users').update(updatePayload).in('telegram_id', members);
   }
   return team;
 }
@@ -485,8 +498,52 @@ async function setPlayerStatus(playerInput, status) {
   let player = (players || []).find(p => p.in_game_name === playerInput || p.username === playerInput.replace('@', '') || String(p.telegram_id) === String(playerInput));
   if (!player) throw new Error(`Player '${playerInput}' not found.`);
 
-  await supabase.from('users').update({ status }).eq('telegram_id', String(player.telegram_id));
-  return player;
+  const isEliminated = status === 'Eliminated';
+  const updatePayload = isEliminated ? { status: 'Eliminated', msgc_registered: false } : { status: 'Active', msgc_registered: true };
+  const { data: updated } = await supabase.from('users').update(updatePayload).eq('telegram_id', String(player.telegram_id)).select().single();
+  return updated || player;
+}
+
+// Admin: Recruit back an eliminated/kicked player or team
+async function recruitPlayerOrTeam(targetInput) {
+  const { data: teams } = await supabase.from('teams').select('*');
+  let team = (teams || []).find(t => t.name.toLowerCase() === targetInput.toLowerCase().trim());
+
+  if (team) {
+    await supabase.from('teams').update({ status: 'Active' }).eq('id', team.id);
+    const members = team.members || [];
+    if (members.length) {
+      await supabase.from('users').update({ status: 'Active', msgc_registered: true }).in('telegram_id', members);
+    }
+    return { type: 'team', entity: team };
+  }
+
+  const { data: players } = await supabase.from('users').select('*');
+  let player = (players || []).find(p => p.in_game_name === targetInput || p.username === targetInput.replace('@', '') || String(p.telegram_id) === String(targetInput));
+
+  if (!player) throw new Error(`Player or Team '${targetInput}' not found.`);
+
+  const { data: updatedPlayer } = await supabase
+    .from('users')
+    .update({ status: 'Active', msgc_registered: true })
+    .eq('telegram_id', String(player.telegram_id))
+    .select()
+    .single();
+
+  return { type: 'player', entity: updatedPlayer || player };
+}
+
+// Admin: Delete/Remove Entire Team completely from database
+async function deleteTeam(teamInput) {
+  const { data: teams } = await supabase.from('teams').select('*');
+  let team = (teams || []).find(t => t.id === teamInput || t.name.toLowerCase() === teamInput.toLowerCase().trim());
+  if (!team) throw new Error(`Team '${teamInput}' not found.`);
+
+  // Reset team_id and unregister members
+  await supabase.from('users').update({ team_id: null, status: 'Eliminated', msgc_registered: false }).eq('team_id', team.id);
+  // Delete team row
+  await supabase.from('teams').delete().eq('id', team.id);
+  return team;
 }
 
 /**
@@ -498,17 +555,39 @@ async function setPlayerStatus(playerInput, status) {
 // Schedule new match fixture (supports optional game/match name)
 async function createMatch(team1Name, team2Name, matchTime = 'TBD', matchName = 'Tournament Match') {
   const matchId = `match_${Date.now()}`;
+  let formattedTime = matchTime.trim();
+  if (matchName && matchName !== 'Tournament Match') {
+    formattedTime = `${formattedTime} (${matchName.trim()})`;
+  }
+
   const newMatch = {
     id: matchId,
     team1_name: team1Name.trim(),
     team2_name: team2Name.trim(),
-    match_time: matchTime.trim(),
-    match_name: matchName.trim(),
+    match_time: formattedTime,
     status: 'Upcoming'
   };
 
-  const { data: created, error } = await supabase.from('matches').insert(newMatch).select().single();
-  if (error) throw new Error(error.message);
+  // Try inserting with match_name first
+  const { data: created, error } = await supabase
+    .from('matches')
+    .insert({ ...newMatch, match_name: matchName.trim() })
+    .select()
+    .single();
+
+  if (error) {
+    // If match_name column does not exist in Supabase schema cache, fallback cleanly
+    if (error.message && error.message.includes('match_name')) {
+      const { data: fallbackCreated, error: fallbackError } = await supabase
+        .from('matches')
+        .insert(newMatch)
+        .select()
+        .single();
+      if (fallbackError) throw new Error(fallbackError.message);
+      return { ...fallbackCreated, match_name: matchName.trim() };
+    }
+    throw new Error(error.message);
+  }
   return created;
 }
 
@@ -519,12 +598,16 @@ async function editMatch(identifier, newTeam1, newTeam2, newTime = 'TBD', newNam
 
   if (!match) throw new Error(`Match '${identifier}' not found.`);
 
+  let formattedTime = newTime.trim();
+  if (newName) {
+    formattedTime = `${formattedTime} (${newName.trim()})`;
+  }
+
   const updateData = {
     team1_name: newTeam1.trim(),
     team2_name: newTeam2.trim(),
-    match_time: newTime.trim()
+    match_time: formattedTime
   };
-  if (newName) updateData.match_name = newName.trim();
 
   const { data: updated, error } = await supabase
     .from('matches')
@@ -534,7 +617,7 @@ async function editMatch(identifier, newTeam1, newTeam2, newTime = 'TBD', newNam
     .single();
 
   if (error) throw new Error(error.message);
-  return updated;
+  return { ...updated, match_name: newName ? newName.trim() : (updated.match_name || 'Tournament Match') };
 }
 
 // Get all scheduled matches
@@ -576,10 +659,16 @@ async function addTeamScore(teamName, points) {
   return updated;
 }
 
-// Get Tournament Leaderboard with Wins/Losses stats calculated from completed matches
+// Get Tournament Leaderboard with member coins summed into total team score & Wins/Losses stats
 async function getLeaderboard() {
-  const { data: teams, error } = await supabase.from('teams').select('*').order('points', { ascending: false });
-  if (error) return [];
+  const { data: teams, error } = await supabase.from('teams').select('*');
+  if (error || !teams) return [];
+
+  const { data: players } = await supabase.from('users').select('*');
+  const playerMap = {};
+  (players || []).forEach(p => {
+    playerMap[String(p.telegram_id)] = p.coins !== undefined && p.coins !== null ? p.coins : (p.solo_score || 0);
+  });
   
   const { data: matches } = await supabase.from('matches').select('*').eq('status', 'Completed');
 
@@ -602,15 +691,27 @@ async function getLeaderboard() {
     }
   });
 
-  return (teams || []).map(t => {
+  const processedTeams = teams.map(t => {
     const key = t.name.toLowerCase();
     const stats = winLossMap[key] || { wins: 0, losses: 0 };
+    const members = t.members || [];
+    
+    // Sum all members' power coins into team score
+    const memberCoinsSum = members.reduce((sum, memId) => sum + (playerMap[String(memId)] || 0), 0);
+    const totalTeamPoints = (t.points || 0) + memberCoinsSum;
+
     return {
       ...t,
+      points: totalTeamPoints,
+      member_coins: memberCoinsSum,
       wins: stats.wins,
       losses: stats.losses
     };
   });
+
+  // Sort by total team points descending
+  processedTeams.sort((a, b) => b.points - a.points);
+  return processedTeams;
 }
 
 /**
@@ -630,35 +731,96 @@ async function setRegistrationStatus(status) {
   await supabase.from('settings').upsert({ key: 'registration_open', value: JSON.stringify(status) });
 }
 
-// Tournament Rules
-async function getTournamentRules() {
-  const { data: doc } = await supabase.from('settings').select('value').eq('key', 'tournament_rules').maybeSingle();
-  if (!doc || doc.value === 'NONE' || doc.value === '""' || !doc.value) {
-    return '📜 Official MSGC Tournament Rules:\n\nNo active rules set yet by the tournament organiser.';
-  }
-  let val = typeof doc.value === 'string' ? doc.value : JSON.stringify(doc.value);
+// Tournament Rules Dictionary / List Management
+async function getTournamentRulesList() {
+  const { data: doc } = await supabase.from('settings').select('value').eq('key', 'tournament_rules_list').maybeSingle();
+  if (!doc || !doc.value) return [];
   try {
-    const parsed = JSON.parse(val);
-    val = parsed;
-  } catch (e) {}
-  return val;
+    const list = typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+async function saveTournamentRulesList(rulesList) {
+  await supabase.from('settings').upsert({ key: 'tournament_rules_list', value: JSON.stringify(rulesList) });
+}
+
+async function addTournamentRule(ruleText) {
+  const list = await getTournamentRulesList();
+  list.push(ruleText.trim());
+  await saveTournamentRulesList(list);
+  return { ruleNumber: list.length, totalRules: list.length, rulesList: list };
+}
+
+async function removeTournamentRuleByNumber(ruleNum) {
+  const list = await getTournamentRulesList();
+  if (ruleNum < 1 || ruleNum > list.length) {
+    throw new Error(`Rule #${ruleNum} does not exist. Total rules available: ${list.length}`);
+  }
+  const removedRule = list.splice(ruleNum - 1, 1)[0];
+  await saveTournamentRulesList(list);
+  return { removedRule, remainingRules: list };
+}
+
+async function getTournamentRules() {
+  const list = await getTournamentRulesList();
+  if (!list.length) {
+    // Check legacy single-string fallback
+    const { data: doc } = await supabase.from('settings').select('value').eq('key', 'tournament_rules').maybeSingle();
+    if (doc && doc.value && doc.value !== 'NONE' && doc.value !== '""') {
+      let val = typeof doc.value === 'string' ? doc.value : JSON.stringify(doc.value);
+      try { val = JSON.parse(val); } catch (e) {}
+      return `📜 <b>Official MSGC Tournament Rules:</b>\n\n${val}`;
+    }
+    return '📜 <b>Official MSGC Tournament Rules:</b>\n\nNo active rules set yet by the tournament organiser.';
+  }
+
+  let text = `📜 <b>OFFICIAL TOURNAMENT RULES & GUIDELINES</b> 📜\n\n`;
+  list.forEach((rule, idx) => {
+    text += `<b>${idx + 1}.</b> ${rule}\n`;
+  });
+  return text;
 }
 
 async function setTournamentRules(rulesText) {
-  await supabase.from('settings').upsert({ key: 'tournament_rules', value: JSON.stringify(rulesText) });
+  // Support adding a rule via setrules or setting first rule
+  await addTournamentRule(rulesText);
 }
 
 async function clearTournamentRules() {
+  await saveTournamentRulesList([]);
   await supabase.from('settings').upsert({ key: 'tournament_rules', value: JSON.stringify('NONE') });
 }
 
-// Declare Champion
-async function declareChampion(winningTeamName) {
-  const { data: team } = await supabase.from('teams').select('*').ilike('name', winningTeamName.trim()).maybeSingle();
-  if (!team) throw new Error(`Team '${winningTeamName}' not found.`);
+// Declare Champion (Team or Solo Player)
+async function declareChampion(winnerInput) {
+  const cleanInput = String(winnerInput).trim();
+  
+  // Try team lookup first
+  const { data: team } = await supabase.from('teams').select('*').ilike('name', cleanInput).maybeSingle();
+  if (team) {
+    await supabase.from('settings').upsert({ key: 'tournament_champion', value: JSON.stringify({ type: 'team', entity: team }) });
+    return { type: 'team', entity: team };
+  }
 
-  await supabase.from('settings').upsert({ key: 'tournament_champion', value: JSON.stringify(team) });
-  return team;
+  // Fallback to player lookup
+  const { data: players } = await supabase.from('users').select('*');
+  const lowerInput = cleanInput.toLowerCase().replace('@', '');
+  let player = (players || []).find(p => {
+    const ign = p.in_game_name ? String(p.in_game_name).trim().toLowerCase() : '';
+    const uname = p.username ? String(p.username).trim().toLowerCase() : '';
+    const tid = String(p.telegram_id);
+    return ign === lowerInput || uname === lowerInput || tid === lowerInput;
+  });
+
+  if (player) {
+    await supabase.from('settings').upsert({ key: 'tournament_champion', value: JSON.stringify({ type: 'player', entity: player }) });
+    return { type: 'player', entity: player };
+  }
+
+  throw new Error(`Team or Player '${winnerInput}' not found.`);
 }
 
 // Tournament Mode (Team vs Solo)
@@ -679,29 +841,45 @@ async function setTournamentMode(mode) {
   return cleanMode;
 }
 
-// Get Solo Leaderboard (Active Players only)
+// Get Solo Leaderboard (Active Players only, ordering by coins/solo_score)
 async function getSoloLeaderboard() {
   const { data: players, error } = await supabase
     .from('users')
     .select('*')
-    .eq('status', 'Active')
-    .order('solo_score', { ascending: false });
+    .eq('msgc_registered', true)
+    .order('coins', { ascending: false });
 
   if (error) return [];
-  return players || [];
+  
+  // Filter active players (supporting string or object status)
+  return (players || []).filter(p => {
+    if (!p.status) return true;
+    if (typeof p.status === 'string') return p.status.trim() !== 'Eliminated';
+    if (typeof p.status === 'object') return p.status.status !== 'Eliminated';
+    return true;
+  });
 }
 
-// Add Solo Score to Player
+// Add Solo Score / Coins to Player (Syncs both coins and solo_score columns)
 async function addSoloScore(playerInput, points) {
   const { data: players } = await supabase.from('users').select('*');
-  let player = (players || []).find(p => p.in_game_name === playerInput || p.username === playerInput.replace('@', '') || String(p.telegram_id) === String(playerInput));
+  const cleanInput = String(playerInput).trim().toLowerCase().replace('@', '');
+
+  let player = (players || []).find(p => {
+    const ign = p.in_game_name ? String(p.in_game_name).trim().toLowerCase() : '';
+    const uname = p.username ? String(p.username).trim().toLowerCase() : '';
+    const tid = String(p.telegram_id);
+    return ign === cleanInput || uname === cleanInput || tid === cleanInput;
+  });
 
   if (!player) throw new Error(`Player '${playerInput}' not found.`);
 
-  const newScore = (player.solo_score || 0) + points;
+  const currentVal = player.coins !== undefined && player.coins !== null ? player.coins : (player.solo_score || 0);
+  const newScore = currentVal + points;
+
   const { data: updated, error } = await supabase
     .from('users')
-    .update({ solo_score: newScore })
+    .update({ coins: newScore, solo_score: newScore })
     .eq('telegram_id', String(player.telegram_id))
     .select()
     .single();
@@ -730,6 +908,8 @@ module.exports = {
   transferCaptainship,
   setTeamStatus,
   setPlayerStatus,
+  recruitPlayerOrTeam,
+  deleteTeam,
   createMatch,
   editMatch,
   getAllMatches,
@@ -739,6 +919,8 @@ module.exports = {
   setRegistrationStatus,
   isRegistrationOpen,
   setTournamentRules,
+  addTournamentRule,
+  removeTournamentRuleByNumber,
   clearTournamentRules,
   getTournamentRules,
   declareChampion,
