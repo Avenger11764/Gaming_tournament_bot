@@ -495,14 +495,15 @@ async function setPlayerStatus(playerInput, status) {
  * -------------------------------------------------------------
  */
 
-// Schedule new match fixture
-async function createMatch(team1Name, team2Name, matchTime = 'TBD') {
+// Schedule new match fixture (supports optional game/match name)
+async function createMatch(team1Name, team2Name, matchTime = 'TBD', matchName = 'Tournament Match') {
   const matchId = `match_${Date.now()}`;
   const newMatch = {
     id: matchId,
     team1_name: team1Name.trim(),
     team2_name: team2Name.trim(),
     match_time: matchTime.trim(),
+    match_name: matchName.trim(),
     status: 'Upcoming'
   };
 
@@ -512,19 +513,22 @@ async function createMatch(team1Name, team2Name, matchTime = 'TBD') {
 }
 
 // Edit match fixture
-async function editMatch(identifier, newTeam1, newTeam2, newTime = 'TBD') {
+async function editMatch(identifier, newTeam1, newTeam2, newTime = 'TBD', newName = null) {
   const { data: matches } = await supabase.from('matches').select('*');
   let match = (matches || []).find(m => m.id === identifier || m.team1_name.toLowerCase().includes(identifier.toLowerCase()) || m.team2_name.toLowerCase().includes(identifier.toLowerCase()));
 
   if (!match) throw new Error(`Match '${identifier}' not found.`);
 
+  const updateData = {
+    team1_name: newTeam1.trim(),
+    team2_name: newTeam2.trim(),
+    match_time: newTime.trim()
+  };
+  if (newName) updateData.match_name = newName.trim();
+
   const { data: updated, error } = await supabase
     .from('matches')
-    .update({
-      team1_name: newTeam1.trim(),
-      team2_name: newTeam2.trim(),
-      match_time: newTime.trim()
-    })
+    .update(updateData)
     .eq('id', match.id)
     .select()
     .single();
@@ -561,7 +565,7 @@ async function setMatchWinner(matchIdOrTeam, winnerTeamName) {
   return updated;
 }
 
-// Add Score Points to Team
+// Add or Deduct Score Points of Team
 async function addTeamScore(teamName, points) {
   const { data: team } = await supabase.from('teams').select('*').ilike('name', teamName.trim()).maybeSingle();
   if (!team) throw new Error(`Team '${teamName}' not found.`);
@@ -572,11 +576,41 @@ async function addTeamScore(teamName, points) {
   return updated;
 }
 
-// Get Tournament Leaderboard
+// Get Tournament Leaderboard with Wins/Losses stats calculated from completed matches
 async function getLeaderboard() {
   const { data: teams, error } = await supabase.from('teams').select('*').order('points', { ascending: false });
   if (error) return [];
-  return teams || [];
+  
+  const { data: matches } = await supabase.from('matches').select('*').eq('status', 'Completed');
+
+  const winLossMap = {};
+  (matches || []).forEach(m => {
+    if (!m.winner_team_name) return;
+    const t1 = m.team1_name.toLowerCase();
+    const t2 = m.team2_name.toLowerCase();
+    const winner = m.winner_team_name.toLowerCase();
+
+    if (!winLossMap[t1]) winLossMap[t1] = { wins: 0, losses: 0 };
+    if (!winLossMap[t2]) winLossMap[t2] = { wins: 0, losses: 0 };
+
+    if (t1 === winner) {
+      winLossMap[t1].wins += 1;
+      winLossMap[t2].losses += 1;
+    } else if (t2 === winner) {
+      winLossMap[t2].wins += 1;
+      winLossMap[t1].losses += 1;
+    }
+  });
+
+  return (teams || []).map(t => {
+    const key = t.name.toLowerCase();
+    const stats = winLossMap[key] || { wins: 0, losses: 0 };
+    return {
+      ...t,
+      wins: stats.wins,
+      losses: stats.losses
+    };
+  });
 }
 
 /**
@@ -599,12 +633,23 @@ async function setRegistrationStatus(status) {
 // Tournament Rules
 async function getTournamentRules() {
   const { data: doc } = await supabase.from('settings').select('value').eq('key', 'tournament_rules').maybeSingle();
-  if (!doc) return '📜 Official MSGC Tournament Rules:\n\n1. Fair play & respect all players.\n2. Captains manage team roster.\n3. Follow schedule times closely.';
-  return typeof doc.value === 'string' ? doc.value : JSON.stringify(doc.value);
+  if (!doc || doc.value === 'NONE' || doc.value === '""' || !doc.value) {
+    return '📜 Official MSGC Tournament Rules:\n\nNo active rules set yet by the tournament organiser.';
+  }
+  let val = typeof doc.value === 'string' ? doc.value : JSON.stringify(doc.value);
+  try {
+    const parsed = JSON.parse(val);
+    val = parsed;
+  } catch (e) {}
+  return val;
 }
 
 async function setTournamentRules(rulesText) {
   await supabase.from('settings').upsert({ key: 'tournament_rules', value: JSON.stringify(rulesText) });
+}
+
+async function clearTournamentRules() {
+  await supabase.from('settings').upsert({ key: 'tournament_rules', value: JSON.stringify('NONE') });
 }
 
 // Declare Champion
@@ -694,6 +739,7 @@ module.exports = {
   setRegistrationStatus,
   isRegistrationOpen,
   setTournamentRules,
+  clearTournamentRules,
   getTournamentRules,
   declareChampion,
   getTournamentMode,

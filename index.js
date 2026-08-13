@@ -30,6 +30,7 @@ const {
   addTeamScore,
   getLeaderboard,
   setTournamentRules,
+  clearTournamentRules,
   getTournamentRules,
   declareChampion,
   getChampion,
@@ -718,8 +719,8 @@ Welcome! Here is a full breakdown of every command available in the bot and how 
   View your team roster, captain, join code, and player status (🟢 Active / 🔴 Eliminated).
 • \`/leaveteam\`
   Leave your current team (Transfers captaincy if you are captain).
-• \`/makecaptain <TeammateIGN>\` (Captain Only)
-  Transfers team captainship to a teammate. (Or reply to their message with \`/makecaptain\`).
+• \`/makecaptain <TeammateIGN>\` or \`/make <TeammateIGN>\` (Captain Only)
+  Transfers team captainship to a teammate. (Or reply to their message with \`/make\`).
 
 ---
 
@@ -733,7 +734,7 @@ Welcome! Here is a full breakdown of every command available in the bot and how 
 • \`/matches\`
   Displays scheduled & completed match fixtures, match IDs, and winners.
 • \`/leaderboard\`
-  Displays the live tournament Scoreboard table ranked by total points.
+  Displays the live tournament Scoreboard table with Points, Wins (W), and Losses (L).
 • \`/rules\`
   Displays official tournament rules & guidelines.
 
@@ -741,12 +742,12 @@ Welcome! Here is a full breakdown of every command available in the bot and how 
 
 👑 *4. ORGANISER & ADMIN COMMANDS (Admins Only)*
 • \`/admin\` - Interactive panel to manage teams, drill down into rosters, and eliminate/restore players or teams.
-• \`/addmatch TeamA vs TeamB @ Time\` - Schedule a match fixture.
-• \`/editmatch <MatchID> TeamA vs TeamB @ Time\` - Edit a match fixture.
+• \`/creatematch TeamA vs TeamB @ Time # GameName\` - Schedule a match fixture.
+• \`/editmatch <MatchID_or_Team> NewTeamA vs NewTeamB @ Time # GameName\` - Edit a match fixture.
 • \`/setwinner <MatchID_or_Team> <WinnerTeam>\` - Record match winner.
-• \`/addscore <TeamName> <Points>\` - Add tournament points to a team.
+• \`/addscore <TeamName> <Points>\` - Add or deduct score points (+10 or -5).
 • \`/openreg\` & \`/closereg\` - Lock or open player registration.
-• \`/setrules <Rules>\` - Update official tournament rules text.
+• \`/setrules <Rules>\` & \`/removerules\` - Set or remove official tournament rules.
 • \`/champion <TeamName>\` - Declare official tournament winner and send victory broadcast.
 • \`/broadcast <Message>\` - Send announcement to all players & group chats.
   `;
@@ -836,25 +837,32 @@ bot.command('matches', async (ctx) => {
 });
 
 
-// Admin Command: /addmatch or /creatematch <Team1> vs <Team2> @ <Time>
+// Admin Command: /addmatch or /creatematch <Team1> vs <Team2> @ <Time> [# Match/Game Name]
 const handleCreateMatch = async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
   const text = ctx.message.text.trim().replace(/^\/(addmatch|creatematch)/i, '').trim();
   
-  // Format: TeamA vs TeamB @ 8 PM
+  // Format: TeamA vs TeamB @ 8 PM # Game/Match Name
   const parts = text.split(/vs|VS|Vs/);
   if (parts.length < 2) {
-    return ctx.replyWithHTML('⚠️ Usage: <code>/addmatch TeamAlpha vs TeamBravo @ 8 PM</code> (or <code>/creatematch</code>)');
+    return ctx.replyWithHTML('⚠️ Usage: <code>/addmatch TeamAlpha vs TeamBravo @ 8 PM # BGMI Tournament</code>\nOr: <code>/creatematch TeamA vs TeamB</code>');
   }
 
   const team1Name = parts[0].trim();
   let team2AndFormat = parts[1].split('@');
   const team2Name = team2AndFormat[0].trim();
-  const matchTime = team2AndFormat[1] ? team2AndFormat[1].trim() : 'TBD';
+  let matchTime = 'TBD';
+  let matchName = 'Tournament Match';
+
+  if (team2AndFormat[1]) {
+    const timeAndName = team2AndFormat[1].split('#');
+    matchTime = timeAndName[0].trim() || 'TBD';
+    if (timeAndName[1]) matchName = timeAndName[1].trim();
+  }
 
   try {
-    const match = await createMatch(team1Name, team2Name, matchTime);
-    return ctx.replyWithHTML(`⚔️ <b>Match Scheduled Successfully!</b>\n\n🛡️ <b>${match.team1_name}</b> VS <b>${match.team2_name}</b>\n📅 <b>Time:</b> <code>${match.match_time}</code>`);
+    const match = await createMatch(team1Name, team2Name, matchTime, matchName);
+    return ctx.replyWithHTML(`⚔️ <b>Match Scheduled Successfully!</b>\n\n🎮 <b>Game/Match Name:</b> ${match.match_name}\n🛡️ <b>${match.team1_name}</b> VS <b>${match.team2_name}</b>\n📅 <b>Time:</b> <code>${match.match_time}</code>\n🆔 <b>Match ID:</b> <code>${match.id}</code>`);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
@@ -862,6 +870,45 @@ const handleCreateMatch = async (ctx) => {
 
 bot.command('addmatch', handleCreateMatch);
 bot.command('creatematch', handleCreateMatch);
+
+// Admin Command: /editmatch <MatchID_or_Team> <NewTeam1> vs <NewTeam2> @ <Time> [# NewGameName]
+bot.command('editmatch', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
+  const text = ctx.message.text.trim().replace(/^\/editmatch/i, '').trim();
+
+  // Usage: /editmatch match_12345 TeamA vs TeamB @ 9 PM # New Match Name
+  const spaceIndex = text.indexOf(' ');
+  if (spaceIndex === -1) {
+    return ctx.replyWithHTML('⚠️ Usage: <code>/editmatch &lt;MatchID_or_Team&gt; NewTeamA vs NewTeamB @ 9 PM # GameName</code>');
+  }
+
+  const identifier = text.substring(0, spaceIndex).trim();
+  const restText = text.substring(spaceIndex + 1).trim();
+
+  const parts = restText.split(/vs|VS|Vs/);
+  if (parts.length < 2) {
+    return ctx.replyWithHTML('⚠️ Usage: <code>/editmatch &lt;MatchID_or_Team&gt; NewTeamA vs NewTeamB @ 9 PM</code>');
+  }
+
+  const newTeam1 = parts[0].trim();
+  let team2AndFormat = parts[1].split('@');
+  const newTeam2 = team2AndFormat[0].trim();
+  let newTime = 'TBD';
+  let newName = null;
+
+  if (team2AndFormat[1]) {
+    const timeAndName = team2AndFormat[1].split('#');
+    newTime = timeAndName[0].trim() || 'TBD';
+    if (timeAndName[1]) newName = timeAndName[1].trim();
+  }
+
+  try {
+    const updatedMatch = await editMatch(identifier, newTeam1, newTeam2, newTime, newName);
+    return ctx.replyWithHTML(`✏️ <b>Match Fixture Updated!</b>\n\n🆔 <b>Match ID:</b> <code>${updatedMatch.id}</code>\n🎮 <b>Game/Match Name:</b> ${updatedMatch.match_name || 'Tournament Match'}\n🛡️ <b>${updatedMatch.team1_name}</b> VS <b>${updatedMatch.team2_name}</b>\n📅 <b>Time:</b> <code>${updatedMatch.match_time}</code>`);
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
+  }
+});
 
 // Admin Command: /addscore <TeamName> <Points>
 bot.command('addscore', async (ctx) => {
@@ -894,28 +941,29 @@ bot.command('addscore', async (ctx) => {
  * -------------------------------------------------------------
  */
 
-// /leaderboard - Display tournament standings table
+// /leaderboard - Display tournament standings table (includes Wins & Losses)
 bot.command('leaderboard', async (ctx) => {
   try {
     const teams = await getLeaderboard();
     if (!teams.length) return ctx.reply('ℹ️ No teams registered yet for leaderboard.');
 
-    let text = `📊 *TOURNAMENT SCORECARD & LEADERBOARD* 📊\n\n`;
-    text += `\`Rank | Team Name        | Pts | Kills\`\n`;
-    text += `\`────────────────────────────────────\`\n`;
+    let text = `📊 <b>TOURNAMENT SCORECARD & LEADERBOARD</b> 📊\n\n`;
+    text += `<code>Rank | Team Name        | Pts | W  | L </code>\n`;
+    text += `<code>───────────────────────────────────────</code>\n`;
 
     teams.forEach((t, idx) => {
       const rank = String(idx + 1).padStart(2, ' ');
-      const name = (t.name.length > 16 ? t.name.substring(0, 13) + '...' : t.name).padEnd(16, ' ');
+      const name = (t.name.length > 14 ? t.name.substring(0, 11) + '...' : t.name).padEnd(14, ' ');
       const pts = String(t.points || 0).padStart(3, ' ');
-      const kills = String(t.kills || 0).padStart(5, ' ');
+      const wins = String(t.wins || 0).padStart(2, ' ');
+      const losses = String(t.losses || 0).padStart(2, ' ');
       const statusEmoji = t.status === 'Active' ? '🟢' : '🔴';
 
-      text += `\`${rank}.  | ${name} | ${pts} | ${kills}\` ${statusEmoji}\n`;
+      text += `<code>${rank}.  | ${name} | ${pts} | ${wins} | ${losses}</code> ${statusEmoji}\n`;
     });
 
-    text += `\n🟢 = Active | 🔴 = Eliminated`;
-    return safeReplyMarkdown(ctx, text);
+    text += `\n🟢 = Active | 🔴 = Eliminated\n<i>W = Matches Won | L = Matches Lost</i>`;
+    return ctx.replyWithHTML(text);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
@@ -961,6 +1009,20 @@ bot.command('setrules', async (ctx) => {
     return ctx.reply(`❌ ${err.message}`);
   }
 });
+
+// Admin Command: /removerules or /delrules - Remove/Reset tournament rules
+const handleRemoveRules = async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
+  try {
+    await clearTournamentRules();
+    return ctx.replyWithHTML('📜 <b>Tournament Rules Cleared Successfully!</b>\n\nPlayers viewing <code>/rules</code> will now see that no active rules are set.');
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
+  }
+};
+
+bot.command('removerules', handleRemoveRules);
+bot.command('delrules', handleRemoveRules);
 
 // Admin Command: /champion <TeamName> - Declare official tournament winner
 bot.command('champion', async (ctx) => {
@@ -1257,6 +1319,36 @@ bot.command('kick', async (ctx) => {
     return ctx.reply(`❌ ${err.message}`);
   }
 });
+
+// /makecaptain or /make <TeammateIGN_or_Handle> - Transfer Captainship
+const handleMakeCaptain = async (ctx) => {
+  try {
+    const text = ctx.message.text.trim();
+    let targetInput = text.split(' ').slice(1).join(' ');
+
+    if (!targetInput && ctx.message.reply_to_message) {
+      targetInput = String(ctx.message.reply_to_message.from.id);
+    }
+
+    if (!targetInput) {
+      return ctx.replyWithHTML('⚠️ Usage Options:\n1. <code>/makecaptain TeammateIGN</code> or <code>/make TeammateIGN</code>\n2. Reply to your teammate\'s message with <code>/makecaptain</code>');
+    }
+
+    const { team, newCaptain } = await transferCaptainship(ctx.from.id, targetInput);
+
+    // Notify new captain
+    try {
+      await bot.telegram.sendMessage(newCaptain.telegram_id, `👑 <b>CONGRATULATIONS!</b>\n\nYou are now the new <b>Team Captain</b> of team <b>${team.name}</b>!`, { parse_mode: 'HTML' });
+    } catch (e) {}
+
+    return ctx.replyWithHTML(`👑 <b>Captainship Transferred!</b>\n\n<b>${newCaptain.in_game_name}</b> is now the Team Captain of team <b>${team.name}</b>!`);
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
+  }
+};
+
+bot.command('makecaptain', handleMakeCaptain);
+bot.command('make', handleMakeCaptain);
 
 // Interactive inline button action for Captain kicking a team member
 bot.action(/^captain_kick_(\d+)$/, async (ctx) => {
