@@ -836,15 +836,15 @@ bot.command('matches', async (ctx) => {
 });
 
 
-// Admin Command: /addmatch <Team1> vs <Team2> @ <Time>
-bot.command('addmatch', async (ctx) => {
+// Admin Command: /addmatch or /creatematch <Team1> vs <Team2> @ <Time>
+const handleCreateMatch = async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
-  const text = ctx.message.text.trim().replace('/addmatch', '').trim();
+  const text = ctx.message.text.trim().replace(/^\/(addmatch|creatematch)/i, '').trim();
   
   // Format: TeamA vs TeamB @ 8 PM
   const parts = text.split(/vs|VS|Vs/);
   if (parts.length < 2) {
-    return ctx.reply('⚠️ Usage: `/addmatch TeamAlpha vs TeamBravo @ 8 PM`', { parse_mode: 'Markdown' });
+    return ctx.replyWithHTML('⚠️ Usage: <code>/addmatch TeamAlpha vs TeamBravo @ 8 PM</code> (or <code>/creatematch</code>)');
   }
 
   const team1Name = parts[0].trim();
@@ -854,7 +854,35 @@ bot.command('addmatch', async (ctx) => {
 
   try {
     const match = await createMatch(team1Name, team2Name, matchTime);
-    return ctx.replyWithMarkdown(`⚔️ *Match Scheduled Successfully!*\n\n🛡️ *${match.team1_name}* VS *${match.team2_name}*\n📅 *Time:* \`${match.match_time}\``);
+    return ctx.replyWithHTML(`⚔️ <b>Match Scheduled Successfully!</b>\n\n🛡️ <b>${match.team1_name}</b> VS <b>${match.team2_name}</b>\n📅 <b>Time:</b> <code>${match.match_time}</code>`);
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
+  }
+};
+
+bot.command('addmatch', handleCreateMatch);
+bot.command('creatematch', handleCreateMatch);
+
+// Admin Command: /addscore <TeamName> <Points>
+bot.command('addscore', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
+  const text = ctx.message.text.trim().replace(/^\/addscore/i, '').trim();
+  const lastSpaceIndex = text.lastIndexOf(' ');
+
+  if (lastSpaceIndex === -1) {
+    return ctx.replyWithHTML('⚠️ Usage: <code>/addscore &lt;TeamName&gt; &lt;Points&gt;</code>\n\nExample: <code>/addscore Warriors 10</code>');
+  }
+
+  const teamName = text.substring(0, lastSpaceIndex).trim();
+  const points = parseInt(text.substring(lastSpaceIndex + 1).trim(), 10);
+
+  if (isNaN(points)) {
+    return ctx.reply('❌ Points must be a valid number!');
+  }
+
+  try {
+    const updatedTeam = await addTeamScore(teamName, points);
+    return ctx.replyWithHTML(`🎯 <b>Score Updated!</b>\n\n🛡️ <b>Team:</b> ${updatedTeam.name}\n➕ <b>Added:</b> +${points} Pts\n📊 <b>Total Points:</b> <code>${updatedTeam.points} Pts</code>`);
   } catch (err) {
     return ctx.reply(`❌ ${err.message}`);
   }
@@ -1577,6 +1605,43 @@ bot.action('admin_main', async (ctx) => {
   );
 });
 
+// Admin Manage Teams Sub-Menu
+bot.action('admin_teams', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('Access Denied');
+  ctx.answerCbQuery();
+
+  try {
+    const teams = await getAllTeams();
+    if (!teams.length) {
+      return ctx.editMessageText('ℹ️ No registered teams found to manage.', {
+        ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Back to Admin Panel', 'admin_main')]])
+      });
+    }
+
+    let text = `🛡️ <b>TEAMS MANAGEMENT CENTER</b>\nTotal Teams: ${teams.length}\n\nSelect a team below to view roster, eliminate/restore, or transfer captainship:`;
+    const buttons = [];
+
+    teams.forEach(t => {
+      const statusIcon = t.status === 'Active' ? '🟢' : '🔴';
+      buttons.push([
+        Markup.button.callback(
+          `${statusIcon} ${t.name} (${t.members.length}/4)`,
+          `adm_t_view_${t.id}`
+        )
+      ]);
+    });
+
+    buttons.push([Markup.button.callback('⬅️ Back to Admin Panel', 'admin_main')]);
+
+    return ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard(buttons)
+    });
+  } catch (err) {
+    return ctx.reply(`❌ ${err.message}`);
+  }
+});
+
 // Admin Matches Sub-Menu
 bot.action('admin_matches_menu', async (ctx) => {
   if (!isAdmin(ctx)) return ctx.answerCbQuery('Access Denied');
@@ -1645,11 +1710,11 @@ bot.action(/adm_m_win_(.+)_(1|2)/, async (ctx) => {
   if (!match) return ctx.answerCbQuery('Match not found');
 
   const winnerTeamName = teamNum === '1' ? match.team1_name : match.team2_name;
-  const { winnerTeam } = await setMatchWinner(matchId, winnerTeamName);
+  const updatedMatch = await setMatchWinner(matchId, winnerTeamName);
 
-  ctx.answerCbQuery(`Set ${winnerTeam.name} as Winner!`);
-  return ctx.editMessageText(`🏆 *MATCH WINNER RECORDED!*\n\n⚔️ Match: ${match.team1_name} VS ${match.team2_name}\n🎉 *WINNER:* **${winnerTeam.name}**`, {
-    parse_mode: 'Markdown',
+  ctx.answerCbQuery(`Set ${winnerTeamName} as Winner!`);
+  return ctx.editMessageText(`🏆 <b>MATCH WINNER RECORDED!</b>\n\n⚔️ Match: ${match.team1_name} VS ${match.team2_name}\n🎉 <b>WINNER:</b> <b>${updatedMatch.winner_team_name}</b>`, {
+    parse_mode: 'HTML',
     ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Back to Matches List', 'admin_matches_menu')]])
   });
 });
