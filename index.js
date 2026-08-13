@@ -230,7 +230,7 @@ function getGuestMenu() {
 You are currently browsing as a **Guest (Not Registered)**.
 
 🎮 *HOW TO JOIN THE TOURNAMENT:*
-Type \`/register <YourInGameName>\` to create your player profile and unlock team creation, Power Store cards, and match play!
+Type \`/register <YourInGameName>\` to create your player profile and unlock team creation and match play!
 
 👇 *GUEST ARENA MENU:*
   `;
@@ -689,7 +689,7 @@ Welcome! Here is a full breakdown of every command available in the bot and how 
 • \`/unregister\`
   Quits the tournament and deletes your profile (with confirmation).
 • \`/profile\`
-  Displays your profile, coin balance, power cards hand, and status.
+  Displays your profile, team details, and status.
 
 ---
 
@@ -707,15 +707,7 @@ Welcome! Here is a full breakdown of every command available in the bot and how 
 
 ---
 
-🛒 *3. POWER STORE & CARDS*
-• \`/store\`
-  Opens the Power Store to inspect all 17 Power Cards (Speed, Vision, Forcefield, Flame, Devil, Karma, etc.) and buy them using Power Coins (PC).
-• \`/use <CardName>\`
-  Play a Power Card from your hand. If the card targets another player (like Flame or Devil), reply to that player's message with \`/use <CardName>\`!
-
----
-
-🏆 *4. TOURNAMENT INFO & FIXTURES*
+🏆 *3. TOURNAMENT INFO & FIXTURES*
 • \`/menu\`
   Brings up the interactive Main Dashboard Menu anytime.
 • \`/teams\`
@@ -731,15 +723,12 @@ Welcome! Here is a full breakdown of every command available in the bot and how 
 
 ---
 
-👑 *5. ORGANISER & ADMIN COMMANDS (Admins Only)*
+👑 *4. ORGANISER & ADMIN COMMANDS (Admins Only)*
 • \`/admin\` - Interactive panel to manage teams, drill down into rosters, and eliminate/restore players or teams.
 • \`/addmatch TeamA vs TeamB @ Time\` - Schedule a match fixture.
 • \`/editmatch <MatchID> TeamA vs TeamB @ Time\` - Edit a match fixture.
 • \`/setwinner <MatchID_or_Team> <WinnerTeam>\` - Record match winner.
 • \`/addscore <TeamName> <Points>\` - Add tournament points to a team.
-• \`/givecoins <IGN> <Amount>\` - Give Power Coins to a player (or reply to their message with \`/givecoins 50\`).
-• \`/giveteamcoins <TeamName> <Amount>\` - Give Power Coins to an entire team roster.
-• \`/awardall <Amount>\` - Give Power Coins to all registered players at once.
 • \`/openreg\` & \`/closereg\` - Lock or open player registration.
 • \`/setrules <Rules>\` - Update official tournament rules text.
 • \`/champion <TeamName>\` - Declare official tournament winner and send victory broadcast.
