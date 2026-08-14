@@ -672,7 +672,8 @@ async function getLeaderboard() {
   const { data: teams, error } = await supabase.from('teams').select('*');
   if (error || !teams) return [];
 
-  const { data: players } = await supabase.from('users').select('*');
+  // Strictly select players where msgc_registered is true
+  const { data: players } = await supabase.from('users').select('*').eq('msgc_registered', true);
   const playerMap = {};
   (players || []).forEach(p => {
     playerMap[String(p.telegram_id)] = p.coins !== undefined && p.coins !== null ? p.coins : (p.solo_score || 0);
@@ -704,7 +705,7 @@ async function getLeaderboard() {
     const stats = winLossMap[key] || { wins: 0, losses: 0 };
     const members = t.members || [];
     
-    // Sum all members' power coins into team score
+    // Sum only registered members' power coins into team score
     const memberCoinsSum = members.reduce((sum, memId) => sum + (playerMap[String(memId)] || 0), 0);
     const totalTeamPoints = (t.points || 0) + memberCoinsSum;
 
@@ -814,7 +815,7 @@ async function declareChampion(winnerInput) {
   }
 
   // Fallback to player lookup
-  const { data: players } = await supabase.from('users').select('*');
+  const { data: players } = await supabase.from('users').select('*').eq('msgc_registered', true);
   const lowerInput = cleanInput.toLowerCase().replace('@', '');
   let player = (players || []).find(p => {
     const ign = p.in_game_name ? String(p.in_game_name).trim().toLowerCase() : '';
@@ -849,7 +850,7 @@ async function setTournamentMode(mode) {
   return cleanMode;
 }
 
-// Get Solo Leaderboard (Active Players only, ordering by coins/solo_score)
+// Get Solo Leaderboard (Active MSGC registered Players only, ordering by coins/solo_score)
 async function getSoloLeaderboard() {
   const { data: players, error } = await supabase
     .from('users')
@@ -859,8 +860,9 @@ async function getSoloLeaderboard() {
 
   if (error) return [];
   
-  // Filter active players (supporting string or object status)
+  // Filter active registered players (supporting string or object status)
   return (players || []).filter(p => {
+    if (p.msgc_registered === false) return false;
     if (!p.status) return true;
     if (typeof p.status === 'string') return p.status.trim() !== 'Eliminated';
     if (typeof p.status === 'object') return p.status.status !== 'Eliminated';
