@@ -948,7 +948,7 @@ bot.command('addscore', async (ctx) => {
   const lastSpaceIndex = text.lastIndexOf(' ');
 
   if (lastSpaceIndex === -1) {
-    return ctx.replyWithHTML('⚠️ Usage: <code>/addscore &lt;TeamName_or_PlayerIGN&gt; &lt;Points&gt;</code>\n\nExample: <code>/addscore Warriors 10</code> or <code>/addscore Raven 15</code>');
+    return ctx.replyWithHTML('⚠️ Usage: <code>/addscore &lt;TeamName_or_PlayerIGN&gt; &lt;Points&gt;</code>\n\nExample: <code>/addscore Warriors 10</code> or <code>/addscore Raven -5</code>');
   }
 
   const targetInput = text.substring(0, lastSpaceIndex).trim();
@@ -965,22 +965,28 @@ bot.command('addscore', async (ctx) => {
       const updatedUser = await addSoloScore(targetInput, points);
       const ignEsc = String(updatedUser.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const sign = points >= 0 ? `+${points}` : `${points}`;
-      return ctx.replyWithHTML(`🎯 <b>Solo Score Updated!</b>\n\n👤 <b>Player:</b> ${ignEsc}\n➕ <b>Points Change:</b> ${sign} Pts\n📊 <b>Total Solo Score:</b> <code>${updatedUser.solo_score || 0} Pts</code>`);
+      return ctx.replyWithHTML(`🎯 <b>Solo Score Updated!</b>\n\n👤 <b>Player:</b> ${ignEsc}\n➕ <b>Points Change:</b> ${sign} Pts\n📊 <b>Total Solo Score:</b> <code>${updatedUser.coins !== undefined ? updatedUser.coins : (updatedUser.solo_score || 0)} Pts</code>`);
     } catch (err) {
       return ctx.reply(`❌ ${err.message}`);
     }
   }
 
-  // Team mode default, with fallback to solo player lookup if team not found
+  // Team mode: Try updating player individual coins first, fallback to team score
   try {
-    const updatedTeam = await addTeamScore(targetInput, points);
-    return ctx.replyWithHTML(`🎯 <b>Team Score Updated!</b>\n\n🛡️ <b>Team:</b> ${updatedTeam.name}\n➕ <b>Added:</b> +${points} Pts\n📊 <b>Total Points:</b> <code>${updatedTeam.points} Pts</code>`);
+    const updatedUser = await addSoloScore(targetInput, points);
+    const ignEsc = String(updatedUser.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sign = points >= 0 ? `+${points}` : `${points}`;
+    let teamNameMsg = '';
+    if (updatedUser.team_id) {
+      const team = await getTeamDetails(updatedUser.team_id);
+      if (team) teamNameMsg = `\n🛡️ <b>Team:</b> ${team.name}`;
+    }
+    return ctx.replyWithHTML(`🎯 <b>Player Coins & Team Score Updated!</b>\n\n👤 <b>Player:</b> ${ignEsc}${teamNameMsg}\n➕ <b>Points Change:</b> ${sign} Pts\n📊 <b>Player Power Coins:</b> <code>${updatedUser.coins !== undefined ? updatedUser.coins : (updatedUser.solo_score || 0)} Pts</code>\n\n<i>This change automatically reflects in the Team Leaderboard!</i>`);
   } catch (err) {
     try {
-      const updatedUser = await addSoloScore(targetInput, points);
-      const ignEsc = String(updatedUser.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const updatedTeam = await addTeamScore(targetInput, points);
       const sign = points >= 0 ? `+${points}` : `${points}`;
-      return ctx.replyWithHTML(`🎯 <b>Solo Score Updated!</b>\n\n👤 <b>Player:</b> ${ignEsc}\n➕ <b>Points Change:</b> ${sign} Pts\n📊 <b>Total Solo Score:</b> <code>${updatedUser.solo_score || 0} Pts</code>`);
+      return ctx.replyWithHTML(`🎯 <b>Team Base Score Updated!</b>\n\n🛡️ <b>Team:</b> ${updatedTeam.name}\n➕ <b>Points Change:</b> ${sign} Pts\n📊 <b>Total Team Base Points:</b> <code>${updatedTeam.points} Pts</code>`);
     } catch (e) {
       return ctx.reply(`❌ ${err.message}`);
     }
