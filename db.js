@@ -258,7 +258,7 @@ async function requestJoinTeam(userId, joinCode) {
   const members = team.members || [];
   const pending = team.pending_requests || [];
 
-  if (members.length >= 4) throw new Error(`Team '${team.name}' is already FULL (4/4 members)!`);
+  if (members.length >= 2) throw new Error(`Team '${team.name}' is already FULL (2/2 members: 1 Captain, 1 Member)!`);
   if (members.includes(strUserId)) throw new Error(`You are already a member of team '${team.name}'!`);
   if (pending.includes(strUserId)) throw new Error(`You already have a pending join request for team '${team.name}'. Please wait for the Team Captain to accept it.`);
 
@@ -290,7 +290,7 @@ async function acceptJoinRequest(captainId, requesterUserId) {
   const members = team.members || [];
   const pending = team.pending_requests || [];
 
-  if (members.length >= 4) throw new Error(`Team '${team.name}' is already FULL!`);
+  if (members.length >= 2) throw new Error(`Team '${team.name}' is already FULL (2/2 members)!`);
 
   const updatedMembers = [...members, strRequesterId];
   const updatedPending = pending.filter(id => id !== strRequesterId);
@@ -451,7 +451,15 @@ async function kickPlayerFromTeam(playerInput, captainTeamId = null) {
 
   if (team) {
     const updatedMembers = (team.members || []).filter(m => m !== String(targetUser.telegram_id));
-    await supabase.from('teams').update({ members: updatedMembers }).eq('id', team.id);
+    if (updatedMembers.length === 0) {
+      await supabase.from('teams').delete().eq('id', team.id);
+    } else {
+      let newCaptainId = team.captain_id;
+      if (String(team.captain_id) === String(targetUser.telegram_id)) {
+        newCaptainId = updatedMembers[0];
+      }
+      await supabase.from('teams').update({ members: updatedMembers, captain_id: newCaptainId }).eq('id', team.id);
+    }
   }
   await supabase.from('users').update({ team_id: null }).eq('telegram_id', String(targetUser.telegram_id));
 

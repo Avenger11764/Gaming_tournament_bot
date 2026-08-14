@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MSGC Tournament Portal | Autonomous Telegram Esports Bot</title>
+  <meta name="description" content="Official MSGC Esports Tournament Portal. Experience automated Telegram tournament management with team rosters, dynamic leaderboard scoring, solo competition phase, and live match scheduling.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@600;700;800&family=Fira+Code:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="brand">
+      <div class="brand-icon">M</div>
+      <span>MSGC TOURNAMENT</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#features" class="nav-link">Features</a></li>
+      <li><a href="#modes" class="nav-link">Competition Modes</a></li>
+      <li><a href="#commands" class="nav-link">Bot Commands</a></li>
+      <li><a href="#rules" class="nav-link">Rules System</a></li>
+    </ul>
+    <a href="https://t.me/death_peanlty_trial_bot" target="_blank" class="btn-primary">⚡ OPEN IN TELEGRAM</a>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="hero-content">
+      <div class="badge">🎮 Official Esports Tournament Bot</div>
+      <h1 class="hero-title">NEXT-GEN <span>TOURNAMENT MANAGEMENT</span></h1>
+      <p class="hero-desc">
+        Welcome to the official <b>MSGC Gaming Tournament Portal</b>. Fully automated Telegram bot powering team registrations, dynamic coin leaderboards, individual solo phases, numbered rulebook, and instant match scorecards.
+      </p>
+      <div class="hero-btns">
+        <a href="https://t.me/death_peanlty_trial_bot" target="_blank" class="btn-primary">🎮 JOIN TOURNAMENT</a>
+        <a href="#commands" class="btn-secondary">📜 VIEW COMMANDS</a>
+      </div>
+    </div>
+    <div class="hero-media">
+      <img src="hero.jpg" alt="MSGC Tournament Arena" class="hero-image">
+    </div>
+  </header>
+
+  <!-- Core Features Section -->
+  <section id="features" class="section">
+    <div class="section-header">
+      <h2 class="section-title">ENGINEERED FOR COMPETITIVE GAMING</h2>
+      <p class="section-subtitle">Everything players and tournament admins need for seamless execution.</p>
+    </div>
+
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <h3 class="card-title">Team Roster & Captains</h3>
+        <p class="card-desc">
+          Form 4-player competitive squads with unique join codes. Captains have interactive <b>🚫 Kick</b> controls and <b>👑 Transfer Captainship</b> features.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3 class="card-title">Power Coin Leaderboard</h3>
+        <p class="card-desc">
+          Player power coins are automatically aggregated into team standings in real-time. Displays Wins (W), Losses (L), and Total Points.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">👤</div>
+        <h3 class="card-title">Solo Competition Phase</h3>
+        <p class="card-desc">
+          Admins can toggle to <b>Solo Competition</b> mode with <code>/setmode solo</code>. All active players automatically transition into solo leaderboard rankings.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">📜</div>
+        <h3 class="card-title">Indexed Rules Dictionary</h3>
+        <p class="card-desc">
+          Official tournament rules are stored as a numbered dictionary (1, 2, 3...). Admins can add or delete specific rules by number with auto-reindexing.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">⚔️</div>
+        <h3 class="card-title">Match Fixtures & Winners</h3>
+        <p class="card-desc">
+          Schedule matches with optional Game Names (e.g. <code># Game 1</code>). Win declarations automatically compute score points and win/loss records.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🔄</div>
+        <h3 class="card-title">Recruitment & Restoration</h3>
+        <p class="card-desc">
+          Eliminated or kicked players can be brought back anytime with <code>/recruit &lt;PlayerIGN&gt;</code>, setting their active status and registration back to true.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Competition Modes Section -->
+  <section id="modes" class="section" style="background: var(--bg-secondary);">
+    <div class="section-header">
+      <h2 class="section-title">TWO DYNAMIC COMPETITION PHASES</h2>
+      <p class="section-subtitle">Adaptable tournament flow for team battle royales and individual finals.</p>
+    </div>
+
+    <div class="grid-3">
+      <div class="card" style="border-top: 3px solid var(--accent-cyan);">
+        <div class="card-icon" style="color: var(--accent-cyan);">🛡️</div>
+        <h3 class="card-title">Phase 1: Team Battles</h3>
+        <p class="card-desc">
+          Squads compete for match victories. Total team points equal base tournament points plus the sum of all 4 members' Power Store coins.
+        </p>
+      </div>
+
+      <div class="card" style="border-top: 3px solid var(--accent-amber);">
+        <div class="card-icon" style="color: var(--accent-amber);">👤</div>
+        <h3 class="card-title">Phase 2: Solo Finals</h3>
+        <p class="card-desc">
+          When admins trigger <code>/setmode solo</code>, team rankings switch to individual solo rankings. Each player's Power Coins act as their solo tournament score.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Commands Reference Table -->
+  <section id="commands" class="section">
+    <div class="section-header">
+      <h2 class="section-title">TELEGRAM BOT COMMAND DIRECTORY</h2>
+      <p class="section-subtitle">Complete list of player and organiser commands.</p>
+    </div>
+
+    <div class="cmd-box">
+      <h3 style="color: var(--accent-cyan); margin-bottom: 1rem;">👤 Player Commands</h3>
+      <table class="cmd-table">
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="cmd-name">/register &lt;IGN&gt;</span></td>
+            <td>Register your player profile with your In-Game Name (IGN).</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/profile</span></td>
+            <td>View your status (🟢 Active / 🔴 Eliminated), IGN, and Telegram ID.</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/createteam &lt;Name&gt;</span></td>
+            <td>Create a 4-player team with a unique 6-character Join Code.</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/jointeam &lt;Code&gt;</span></td>
+            <td>Request to join a team using its Join Code.</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/myteam</span></td>
+            <td>View team roster, captain, join code, and player statuses.</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/makecaptain &lt;IGN&gt;</span></td>
+            <td>(Captain Only) Transfer team captainship to a teammate. Alias: <code>/make</code></td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/leaderboard</span></td>
+            <td>View live tournament standings with Points, Wins (W), and Losses (L).</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/rules</span></td>
+            <td>View the official numbered tournament rules dictionary.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="color: var(--accent-amber); margin-top: 2.5rem; margin-bottom: 1rem;">👑 Organiser / Admin Commands</h3>
+      <table class="cmd-table">
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="cmd-name">/admin</span></td>
+            <td>Open interactive dashboard for team management, rosters, and status toggles.</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/addscore &lt;TeamOrPlayer&gt; &lt;Pts&gt;</span></td>
+            <td>Add or deduct score points (+10 or -5). Works for teams and solo players.</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/eliminate &lt;TeamOrPlayer&gt;</span></td>
+            <td>Mark team or player as 🔴 Eliminated. Aliases: <code>/eilimnate</code>, <code>/elim</code></td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/recruit &lt;TeamOrPlayer&gt;</span></td>
+            <td>Recruit back an eliminated/kicked player or team to 🟢 Active status.</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/addrule &lt;RuleText&gt;</span></td>
+            <td>Add a new numbered rule (1, 2, 3...) to the dictionary. Alias: <code>/setrules</code></td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/removerule &lt;RuleNumber&gt;</span></td>
+            <td>Remove a specific rule by its number (e.g. <code>/removerule 2</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/setmode &lt;team|solo&gt;</span></td>
+            <td>Switch competition between Team Battle phase and Solo Competition phase.</td>
+          </tr>
+          <tr>
+            <td><span class="cmd-name">/champion &lt;TeamOrPlayer&gt;</span></td>
+            <td>Declare official tournament winner and broadcast victory announcement.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-brand">MSGC GAMING TOURNAMENT</div>
+    <p>© 2026 MSGC Esports. All rights reserved. Powered by Telegram Bot & Supabase Database.</p>
+  </footer>
+
+</body>
+</html>

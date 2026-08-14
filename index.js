@@ -722,81 +722,79 @@ bot.action('cmd_leaveteam', async (ctx) => {
 
 
 
-// Comprehensive Guide Text
+// Comprehensive Guide Text (HTML formatted so commands highlight as clickable code blocks on Telegram mobile/desktop)
 function getHelpGuide() {
-  return `
-📖 *MSGC TOURNAMENT BOT - COMPLETE GUIDE & COMMAND LIST* 📖
+  return `📖 <b>MSGC TOURNAMENT BOT - COMPLETE GUIDE & COMMAND LIST</b> 📖
 
 Welcome! Here is a full breakdown of every command available in the bot and how to use them:
 
----
+───
 
-🎮 *1. REGISTRATION & PROFILE*
-• \`/register <InGameName>\`
+🎮 <b>1. REGISTRATION & PROFILE</b>
+• <code>/register &lt;InGameName&gt;</code>
   Creates your tournament player profile with your IGN.
-• \`/unregister\`
+• <code>/unregister</code>
   Quits the tournament and deletes your profile (with confirmation).
-• \`/profile\`
+• <code>/profile</code>
   Displays your profile, team details, and status.
 
----
+───
 
-🛡️ *2. TEAM MANAGEMENT*
-• \`/createteam <TeamName>\`
-  Creates a new team with a 6-character Join Code. You become Team Captain. (Max 4 players per team).
-• \`/jointeam <JoinCode>\`
+🛡️ <b>2. TEAM MANAGEMENT (2 Players Max: 1 Captain, 1 Member)</b>
+• <code>/createteam &lt;TeamName&gt;</code>
+  Creates a new team with a 6-character Join Code. You become Team Captain. (Max 2 players per team).
+• <code>/jointeam &lt;JoinCode&gt;</code>
   Join an existing team using its Join Code.
-• \`/myteam\`
+• <code>/myteam</code>
   View your team roster, captain, join code, and player status (🟢 Active / 🔴 Eliminated).
-• \`/leaveteam\`
-  Leave your current team (Transfers captaincy if you are captain).
-• \`/makecaptain <TeammateIGN>\` or \`/make <TeammateIGN>\` (Captain Only)
-  Transfers team captainship to a teammate. (Or reply to their message with \`/make\`).
+• <code>/leaveteam</code>
+  Leave your current team (Transfers captaincy if you are captain). If all players leave, team is deleted automatically.
+• <code>/makecaptain &lt;TeammateIGN&gt;</code> or <code>/make &lt;TeammateIGN&gt;</code>
+  (Captain Only) Transfers team captainship to your teammate. (Or reply to their message with <code>/make</code>).
 
----
+───
 
-🏆 *3. TOURNAMENT INFO & FIXTURES*
-• \`/menu\`
+🏆 <b>3. TOURNAMENT INFO & FIXTURES</b>
+• <code>/menu</code>
   Brings up the interactive Main Dashboard Menu anytime.
-• \`/teams\`
+• <code>/teams</code>
   Lists all registered teams with real-time active/eliminated counts.
-• \`/players\`
+• <code>/players</code>
   Lists all registered players with handle/profile name and status.
-• \`/matches\`
+• <code>/matches</code>
   Displays scheduled & completed match fixtures, match IDs, and winners.
-• \`/leaderboard\`
+• <code>/leaderboard</code>
   Displays the live tournament Scoreboard table with Points, Wins (W), and Losses (L).
-• \`/rules\`
+• <code>/rules</code>
   Displays official tournament rules & guidelines.
 
----
+───
 
-👑 *4. ORGANISER & ADMIN COMMANDS (Admins Only)*
-• \`/admin\` - Interactive panel to manage teams, drill down into rosters, and eliminate/restore players or teams.
-• \`/creatematch TeamA vs TeamB @ Time # GameName\` - Schedule a match fixture.
-• \`/editmatch <MatchID_or_Team> NewTeamA vs NewTeamB @ Time # GameName\` - Edit a match fixture.
-• \`/setwinner <MatchID_or_Team> <WinnerTeam>\` - Record match winner.
-• \`/addscore <TeamName> <Points>\` - Add or deduct score points (+10 or -5).
-• \`/openreg\` & \`/closereg\` - Lock or open player registration.
-• \`/addrule <RuleText>\` - Add a new numbered rule (1, 2, 3...) to the dictionary.
-• \`/removerule <RuleNumber>\` - Delete a specific rule by number (e.g. \`/removerule 2\`).
-• \`/clearallrules\` - Remove all rules from the dictionary.
-• \`/champion <TeamName>\` - Declare official tournament winner and send victory broadcast.
-• \`/broadcast <Message>\` - Send announcement to all players & group chats.
-  `;
+👑 <b>4. ORGANISER & ADMIN COMMANDS (Admins Only)</b>
+• <code>/admin</code> - Interactive panel to manage teams, drill down into rosters, and eliminate/restore players or teams.
+• <code>/creatematch TeamA vs TeamB @ Time # GameName</code> - Schedule a match fixture.
+• <code>/editmatch &lt;MatchID_or_Team&gt; NewTeamA vs NewTeamB @ Time # GameName</code> - Edit a match fixture.
+• <code>/setwinner &lt;MatchID_or_Team&gt; &lt;WinnerTeam&gt;</code> - Record match winner.
+• <code>/addscore &lt;TeamName_or_PlayerIGN&gt; &lt;Points&gt;</code> - Add or deduct score points (+10 or -5).
+• <code>/openreg</code> & <code>/closereg</code> - Lock or open player registration.
+• <code>/addrule &lt;RuleText&gt;</code> - Add a new numbered rule (1, 2, 3...) to the dictionary.
+• <code>/removerule &lt;RuleNumber&gt;</code> - Delete a specific rule by number (e.g. <code>/removerule 2</code>).
+• <code>/clearallrules</code> - Remove all rules from the dictionary.
+• <code>/champion &lt;TeamName_or_PlayerIGN&gt;</code> - Declare official tournament winner and send victory broadcast.
+• <code>/broadcast &lt;Message&gt;</code> - Send announcement to all players & group chats.`;
 }
 
 
 // /help command
 bot.help(async (ctx) => {
-  return safeReplyMarkdown(ctx, getHelpGuide(), Markup.inlineKeyboard([
+  return ctx.replyWithHTML(getHelpGuide(), Markup.inlineKeyboard([
     [Markup.button.callback('🏠 Main Menu', 'cmd_menu')]
   ]));
 });
 
 bot.action('cmd_help', async (ctx) => {
   ctx.answerCbQuery();
-  return safeReplyMarkdown(ctx, getHelpGuide(), Markup.inlineKeyboard([
+  return ctx.replyWithHTML(getHelpGuide(), Markup.inlineKeyboard([
     [Markup.button.callback('🏠 Main Menu', 'cmd_menu')]
   ]));
 });
@@ -1349,7 +1347,7 @@ bot.action(/accept_join_(.+)/, async (ctx) => {
       await bot.telegram.sendMessage(requester.telegram_id, `🎉 *JOIN REQUEST ACCEPTED!*\n\nYou are now an official member of team *${team.name}*!`, { parse_mode: 'Markdown' });
     } catch (e) {}
 
-    return ctx.editMessageText(`✅ *PLAYER ACCEPTED!*\n\n*${requester.in_game_name}* has been added to team *${team.name}*!\n👥 Total Members: ${team.members.length}/4`, { parse_mode: 'Markdown' });
+    return ctx.editMessageText(`✅ <b>PLAYER ACCEPTED!</b>\n\n<b>${requester.in_game_name}</b> has been added to team <b>${team.name}</b>!\n👥 Total Members: ${team.members.length}/2`, { parse_mode: 'HTML' });
   } catch (err) {
     return ctx.answerCbQuery(err.message, { show_alert: true });
   }
@@ -1813,7 +1811,7 @@ bot.action('admin_teams', async (ctx) => {
       const statusIcon = t.status === 'Active' ? '🟢' : '🔴';
       buttons.push([
         Markup.button.callback(
-          `${statusIcon} ${t.name} (${t.members.length}/4)`,
+          `${statusIcon} ${t.name} (${t.members.length}/2)`,
           `adm_t_view_${t.id}`
         )
       ]);
