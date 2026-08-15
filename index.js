@@ -445,21 +445,19 @@ async function renderLeaderboardText() {
     if (!teams.length) return 'ℹ️ No teams registered yet for leaderboard.';
 
     let text = `🛡️ 📊 <b>TEAM TOURNAMENT SCORECARD & LEADERBOARD</b> 📊 🛡️\n\n`;
-    text += `<code>Rank | Team Name        | Pts | W  | L </code>\n`;
-    text += `<code>───────────────────────────────────────</code>\n`;
+    text += `<code>Rank | Team Name        | Total Points</code>\n`;
+    text += `<code>────────────────────────────────────</code>\n`;
 
     teams.forEach((t, idx) => {
       const rank = String(idx + 1).padStart(2, ' ');
-      const name = (t.name.length > 14 ? t.name.substring(0, 11) + '...' : t.name).padEnd(14, ' ');
-      const pts = String(t.points || 0).padStart(3, ' ');
-      const wins = String(t.wins || 0).padStart(2, ' ');
-      const losses = String(t.losses || 0).padStart(2, ' ');
+      const name = (t.name.length > 18 ? t.name.substring(0, 15) + '...' : t.name).padEnd(18, ' ');
+      const pts = String(t.points || 0).padStart(5, ' ');
       const statusEmoji = t.status === 'Active' ? '🟢' : '🔴';
 
-      text += `<code>${rank}.  | ${name} | ${pts} | ${wins} | ${losses}</code> ${statusEmoji}\n`;
+      text += `<code>${rank}.  | ${name} | ${pts}</code> ${statusEmoji}\n`;
     });
 
-    text += `\n🟢 = Active | 🔴 = Eliminated\n<i>W = Matches Won | L = Matches Lost</i>`;
+    text += `\n🟢 = Active | 🔴 = Eliminated`;
     return text;
   }
 }
