@@ -486,16 +486,17 @@ async function transferCaptainship(currentCaptainId, newCaptainInput) {
 }
 
 // Admin: Set Team Status (Active / Eliminated)
-async function setTeamStatus(teamName, status) {
-  const { data: team } = await supabase.from('teams').select('*').ilike('name', teamName.trim()).maybeSingle();
-  if (!team) throw new Error(`Team '${teamName}' not found.`);
+async function setTeamStatus(teamInput, status) {
+  const cleanInput = String(teamInput).trim();
+  const { data: teams } = await supabase.from('teams').select('*');
+  let team = (teams || []).find(t => t.id === cleanInput || t.name.toLowerCase() === cleanInput.toLowerCase());
+
+  if (!team) throw new Error(`Team '${teamInput}' not found.`);
 
   await supabase.from('teams').update({ status }).eq('id', team.id);
   const members = team.members || [];
   if (members.length) {
-    const isEliminated = status === 'Eliminated';
-    const updatePayload = isEliminated ? { status: 'Eliminated', msgc_registered: false } : { status: 'Active', msgc_registered: true };
-    await supabase.from('users').update(updatePayload).in('telegram_id', members);
+    await supabase.from('users').update({ status }).in('telegram_id', members);
   }
   return team;
 }
@@ -506,9 +507,7 @@ async function setPlayerStatus(playerInput, status) {
   let player = (players || []).find(p => p.in_game_name === playerInput || p.username === playerInput.replace('@', '') || String(p.telegram_id) === String(playerInput));
   if (!player) throw new Error(`Player '${playerInput}' not found.`);
 
-  const isEliminated = status === 'Eliminated';
-  const updatePayload = isEliminated ? { status: 'Eliminated', msgc_registered: false } : { status: 'Active', msgc_registered: true };
-  const { data: updated } = await supabase.from('users').update(updatePayload).eq('telegram_id', String(player.telegram_id)).select().single();
+  const { data: updated } = await supabase.from('users').update({ status }).eq('telegram_id', String(player.telegram_id)).select().single();
   return updated || player;
 }
 
