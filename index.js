@@ -1704,24 +1704,7 @@ bot.command('givecoins', async (ctx) => {
   }
 });
 
-// Admin Command: /awardall <amount> - Award coins to all registered players
-
-bot.command('awardall', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('⛔ Access Denied!');
-  const args = ctx.message.text.trim().split(/\s+/).slice(1);
-  const amount = parseInt(args[0], 10);
-
-  if (isNaN(amount) || amount <= 0) {
-    return ctx.reply('⚠️ Usage: `/awardall <amount>`\n\nExample: `/awardall 50`', { parse_mode: 'Markdown' });
-  }
-
-  try {
-    const totalAwarded = await awardAllCoins(amount);
-    return ctx.replyWithMarkdown(`💰 *SUCCESS!* Awarded \`${amount} Power Coins (PC)\` to all **${totalAwarded} registered players**!`);
-  } catch (err) {
-    return ctx.reply(`❌ ${err.message}`);
-  }
-});
+// Note: /awardall and /award are exclusively handled by the Power Store Bot to prevent duplicate coin additions.
 
 
 // Admin Command: /giveteamcoins <TeamName> <amount> - Award coins to all players in a team

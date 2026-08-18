@@ -1077,14 +1077,23 @@ async def award_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.error(f"Error in /award command: {e}")
         await update.message.reply_text("An error occurred while awarding coins.")
 
+LAST_AWARDALL_TIME = 0
+
 async def awardall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Admin command to award coins to all players."""
+    """Admin command to award coins to all players with anti-double execution lock."""
+    global LAST_AWARDALL_TIME
     if update.effective_user.id != ADMIN_USER_ID:
         await update.message.reply_text("You are not authorized to use this command.")
         return
 
     if not db:
         await update.message.reply_text("Database not available.")
+        return
+
+    # 30-second cooldown lock to prevent duplicate rapid executions
+    current_time = time.time()
+    if current_time - LAST_AWARDALL_TIME < 30:
+        await update.message.reply_text("⏳ Please wait 30 seconds before running /awardall again to prevent duplicate awards.")
         return
 
     try:
@@ -1097,10 +1106,15 @@ async def awardall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Usage: /awardall <amount>")
         return
 
+    LAST_AWARDALL_TIME = current_time
+
     try:
         all_players = get_all_players()
         for p in all_players:
-            update_player_data(p['user_id'], {'coins': p.get('coins', 0) + amount})
+            uid = p.get('telegram_id') or p.get('user_id')
+            if not uid or str(uid) == '0': continue
+            new_coins = p.get('coins', 0) + amount
+            update_player_data(uid, {'coins': new_coins, 'solo_score': new_coins})
         
         await update.message.reply_text(f"✅ Successfully awarded {amount} PC to all {len(all_players)} players.")
         await log_activity(context.bot, f"👑 Admin awarded {amount} PC to all {len(all_players)} players.")
