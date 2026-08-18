@@ -2036,43 +2036,50 @@ bot.command('broadcast', async (ctx) => {
 bot.action(/adm_t_view_(.+)/, async (ctx) => {
   if (!isAdmin(ctx)) return ctx.answerCbQuery('Access Denied');
   const teamId = ctx.match[1];
-  const team = await getTeamDetails(teamId);
-  if (!team) return ctx.answerCbQuery('Team not found');
+  try {
+    const team = await getTeamDetails(teamId);
+    if (!team) return ctx.answerCbQuery('Team not found');
 
-  const statusEmoji = team.status === 'Active' ? '🟢' : '🔴';
-  let text = `🛡️ *TEAM MANAGEMENT: ${team.name}*\nStatus: ${statusEmoji} *${team.status}*\nJoin Code: \`${team.join_code}\`\n\n👥 *Roster & Players:*`;
+    const statusEmoji = team.status === 'Active' ? '🟢' : '🔴';
+    let text = `🛡️ <b>TEAM MANAGEMENT: ${team.name}</b>\nStatus: ${statusEmoji} <b>${team.status}</b>\nJoin Code: <code>${team.join_code}</code>\n\n👥 <b>Roster & Players:</b>`;
 
-  const buttons = [];
+    const buttons = [];
 
-  team.memberProfiles.forEach((p) => {
-    const isCaptain = p.telegram_id === team.captain_id ? '👑 Captain' : '👤 Member';
-    const pEmoji = p.status === 'Active' ? '🟢' : '🔴';
-    const handle = formatPlayerHandle(p);
-    text += `\n• *${p.in_game_name}* (${handle}) - ${isCaptain} (${pEmoji} ${p.status})`;
+    team.memberProfiles.forEach((p) => {
+      const isCaptain = String(p.telegram_id) === String(team.captain_id) ? '👑 Captain' : '👤 Member';
+      const cleanStatus = formatPlayerStatus(p.status);
+      const pEmoji = cleanStatus === 'Active' ? '🟢' : '🔴';
+      const handle = formatPlayerHandle(p);
+      const ignEsc = String(p.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      text += `\n• <b>${ignEsc}</b> (${handle}) - ${isCaptain} (${pEmoji} ${cleanStatus})`;
 
-    buttons.push([
-      Markup.button.callback(
-        `${pEmoji} ${p.in_game_name}: ${p.status === 'Active' ? 'Eliminate' : 'Restore'}`,
-        `adm_p_toggle_${p.telegram_id}_${team.id}`
-      ),
-      Markup.button.callback(
-        `👑 Make Capt`,
-        `adm_p_capt_${p.telegram_id}_${team.id}`
-      )
-    ]);
-  });
+      buttons.push([
+        Markup.button.callback(
+          `${pEmoji} ${p.in_game_name}: ${cleanStatus === 'Active' ? 'Eliminate' : 'Restore'}`,
+          `adm_p_toggle_${p.telegram_id}_${team.id}`
+        ),
+        Markup.button.callback(
+          `👑 Make Capt`,
+          `adm_p_capt_${p.telegram_id}_${team.id}`
+        )
+      ]);
+    });
 
+    // Team-wide actions
+    const toggleTeamText = team.status === 'Active' ? '🔴 Eliminate Entire Team' : '🟢 Restore Entire Team';
+    buttons.push([Markup.button.callback(toggleTeamText, `adm_t_toggle_${team.id}`)]);
+    buttons.push([Markup.button.callback('🗑️ Delete Team Completely', `adm_t_del_${team.id}`)]);
+    buttons.push([Markup.button.callback('⬅️ Back to Teams List', 'admin_teams')]);
 
-  // Team-wide actions
-  const toggleTeamText = team.status === 'Active' ? '🔴 Eliminate Entire Team' : '🟢 Restore Entire Team';
-  buttons.push([Markup.button.callback(toggleTeamText, `adm_t_toggle_${team.id}`)]);
-  buttons.push([Markup.button.callback('🗑️ Delete Team Completely', `adm_t_del_${team.id}`)]);
-  buttons.push([Markup.button.callback('⬅️ Back to Teams List', 'admin_teams')]);
-
-  return ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard(buttons)
-  });
+    ctx.answerCbQuery();
+    return ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard(buttons)
+    });
+  } catch (err) {
+    console.error('Error in adm_t_view:', err);
+    return ctx.answerCbQuery(`❌ Error: ${err.message}`, { show_alert: true });
+  }
 });
 
 // Admin Toggle Team Status (Eliminate/Restore whole team)
@@ -2099,40 +2106,50 @@ bot.action(/adm_p_toggle_(.+)_(.+)/, async (ctx) => {
   const playerId = ctx.match[1];
   const teamId = ctx.match[2];
 
-  const player = await getUser(playerId);
-  if (!player) return ctx.answerCbQuery('Player not found');
+  try {
+    const player = await getUser(playerId);
+    if (!player) return ctx.answerCbQuery('Player not found');
 
-  const newStatus = player.status === 'Active' ? 'Eliminated' : 'Active';
-  await setPlayerStatus(playerId, newStatus);
-  ctx.answerCbQuery(`${player.in_game_name} is now ${newStatus}`);
+    const cleanStatus = formatPlayerStatus(player.status);
+    const newStatus = cleanStatus === 'Active' ? 'Eliminated' : 'Active';
+    await setPlayerStatus(playerId, newStatus);
+    ctx.answerCbQuery(`${player.in_game_name} is now ${newStatus}`);
 
-  // Return to team detailed view
-  const team = await getTeamDetails(teamId);
-  let text = `🛡️ *TEAM MANAGEMENT: ${team.name}*\nStatus: ${team.status}\n\n👥 *Roster & Players:*`;
-  const buttons = [];
-  team.memberProfiles.forEach((p) => {
-    const isCaptain = p.telegram_id === team.captain_id ? '👑 Captain' : '👤 Member';
-    const pEmoji = p.status === 'Active' ? '🟢' : '🔴';
-    text += `\n• *${p.in_game_name}* (${isCaptain}) - ${pEmoji} ${p.status}`;
-    buttons.push([
-      Markup.button.callback(
-        `${pEmoji} ${p.in_game_name}: ${p.status === 'Active' ? 'Eliminate' : 'Restore'}`,
-        `adm_p_toggle_${p.telegram_id}_${team.id}`
-      ),
-      Markup.button.callback(
-        `👑 Make Capt`,
-        `adm_p_capt_${p.telegram_id}_${team.id}`
-      )
-    ]);
-  });
-  const toggleTeamText = team.status === 'Active' ? '🔴 Eliminate Entire Team' : '🟢 Restore Entire Team';
-  buttons.push([Markup.button.callback(toggleTeamText, `adm_t_toggle_${team.id}`)]);
-  buttons.push([Markup.button.callback('⬅️ Back to Teams List', 'admin_teams')]);
+    // Return to team detailed view
+    const team = await getTeamDetails(teamId);
+    const statusEmoji = team.status === 'Active' ? '🟢' : '🔴';
+    let text = `🛡️ <b>TEAM MANAGEMENT: ${team.name}</b>\nStatus: ${statusEmoji} <b>${team.status}</b>\n\n👥 <b>Roster & Players:</b>`;
+    const buttons = [];
+    team.memberProfiles.forEach((p) => {
+      const isCaptain = String(p.telegram_id) === String(team.captain_id) ? '👑 Captain' : '👤 Member';
+      const pClean = formatPlayerStatus(p.status);
+      const pEmoji = pClean === 'Active' ? '🟢' : '🔴';
+      const handle = formatPlayerHandle(p);
+      const ignEsc = String(p.in_game_name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      text += `\n• <b>${ignEsc}</b> (${handle}) - ${isCaptain} (${pEmoji} ${pClean})`;
+      buttons.push([
+        Markup.button.callback(
+          `${pEmoji} ${p.in_game_name}: ${pClean === 'Active' ? 'Eliminate' : 'Restore'}`,
+          `adm_p_toggle_${p.telegram_id}_${team.id}`
+        ),
+        Markup.button.callback(
+          `👑 Make Capt`,
+          `adm_p_capt_${p.telegram_id}_${team.id}`
+        )
+      ]);
+    });
+    const toggleTeamText = team.status === 'Active' ? '🔴 Eliminate Entire Team' : '🟢 Restore Entire Team';
+    buttons.push([Markup.button.callback(toggleTeamText, `adm_t_toggle_${team.id}`)]);
+    buttons.push([Markup.button.callback('🗑️ Delete Team Completely', `adm_t_del_${team.id}`)]);
+    buttons.push([Markup.button.callback('⬅️ Back to Teams List', 'admin_teams')]);
 
-  return ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard(buttons)
-  });
+    return ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard(buttons)
+    });
+  } catch (err) {
+    return ctx.answerCbQuery(`❌ Error: ${err.message}`, { show_alert: true });
+  }
 });
 
 // Admin Change Captain
@@ -2141,18 +2158,24 @@ bot.action(/adm_p_capt_(.+)_(.+)/, async (ctx) => {
   const playerId = ctx.match[1];
   const teamId = ctx.match[2];
 
-  const team = await getTeamDetails(teamId);
-  if (!team) return ctx.answerCbQuery('Team not found');
+  try {
+    const team = await getTeamDetails(teamId);
+    if (!team) return ctx.answerCbQuery('Team not found');
 
-  await transferCaptainship(team.captain_id, playerId);
-  ctx.answerCbQuery('Captain transferred!');
+    await transferCaptainship(team.captain_id, playerId);
+    ctx.answerCbQuery('Captain transferred!');
 
-  const updatedTeam = await getTeamDetails(teamId);
-  let text = `👑 Captain set to *${(updatedTeam.memberProfiles.find(p => p.telegram_id === playerId)).in_game_name}*!\n\n🛡️ *TEAM: ${updatedTeam.name}*`;
-  return ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Back to Team View', `adm_t_view_${teamId}`)]])
-  });
+    const updatedTeam = await getTeamDetails(teamId);
+    const newCap = updatedTeam.memberProfiles.find(p => String(p.telegram_id) === String(playerId));
+    const capName = newCap ? newCap.in_game_name : 'Player';
+    let text = `👑 Captain set to <b>${capName}</b>!\n\n🛡️ <b>TEAM: ${updatedTeam.name}</b>`;
+    return ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Back to Team View', `adm_t_view_${teamId}`)]])
+    });
+  } catch (err) {
+    return ctx.answerCbQuery(`❌ Error: ${err.message}`, { show_alert: true });
+  }
 });
 
 
